@@ -1,0 +1,30 @@
+# Réveil quotidien du projet Supabase du jeu « Le Cube »
+# Empêche la mise en pause automatique des projets gratuits (après 7 jours sans activité).
+# Tourne tout seul chaque jour, et peut aussi être lancé à la main :
+# onglet « Actions » → « Réveil Supabase » → bouton « Run workflow ».
+
+name: Réveil Supabase
+
+on:
+  schedule:
+    - cron: '17 6 * * *'     # tous les jours vers 8 h 17 (heure de Paris en été)
+  workflow_dispatch:          # bouton « Run workflow »
+
+jobs:
+  reveil:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Interroger la base de données du jeu
+        env:
+          SUPABASE_URL: https://cdylpulhbbzjbyxyqizp.supabase.co
+          SUPABASE_KEY: sb_publishable_nYB5Mluv2qy_FXXCMG6Fpw_VMP36Xmo   # clé publique (déjà présente dans index.html)
+        run: |
+          code=$(curl -s -o reponse.txt -w "%{http_code}" -X POST "$SUPABASE_URL/rest/v1/rpc/me" \
+            -H "apikey: $SUPABASE_KEY" -H "Content-Type: application/json" -d '{}' --max-time 60)
+          echo "Réponse du serveur : HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::Le projet Supabase ne répond pas normalement (code $code). Il est peut-être en pause : ouvre le tableau de bord Supabase et clique sur « Restore »."
+            cat reponse.txt
+            exit 1
+          fi
+          echo "✅ Projet Supabase réveillé"
