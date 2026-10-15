@@ -1,0 +1,1780 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0d0f14">
+<title>Le Cube — Qu'y a-t-il à l'intérieur ?</title>
+<style>
+  :root{--gold:#ffd34d;--bg:#0d0f14;--card:#16131c;--line:#ffffff26;--txt:#eef1f8}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+  body{-webkit-user-select:none;user-select:none}
+  canvas{display:block;touch-action:none}
+  .hidden{display:none!important}
+  button{font:inherit;font-size:14px;color:var(--txt);background:#ffffff14;border:1px solid var(--line);
+    border-radius:10px;padding:9px 12px;cursor:pointer}
+  button:active{transform:scale(.96)}
+  button:disabled{opacity:.35;cursor:default}
+  button.primary{background:#ffc83d;color:#1a1204;border-color:#ffc83d;font-weight:700}
+  button.danger{border-color:#ff6b6b88;color:#ffb3b3}
+  input,select,textarea{font:inherit;font-size:16px;color:var(--txt);background:#0d0f14;border:1px solid var(--line);
+    border-radius:8px;padding:9px 10px;width:100%;box-sizing:border-box;-webkit-user-select:text;user-select:text}
+  label{display:block;font-size:12px;opacity:.7;margin:10px 0 4px}
+  .muted{opacity:.6;font-size:12px}
+
+  #hud{position:fixed;top:0;left:0;right:0;padding:calc(10px + env(safe-area-inset-top)) 12px 18px;
+    text-align:center;pointer-events:none;background:linear-gradient(#0d0f14e6,#0d0f1400);z-index:3}
+  #count{font-size:clamp(16px,4.6vw,24px);font-weight:700;font-variant-numeric:tabular-nums}
+  #bar{margin:8px auto 0;width:min(420px,80vw);height:5px;border-radius:3px;background:#ffffff1f;overflow:hidden}
+  #barFill{height:100%;width:0;background:linear-gradient(90deg,#6aa8ff,#c47dff,#ff7a59,#ffd34d)}
+  #sub{margin-top:6px;font-size:12px;opacity:.7;font-variant-numeric:tabular-nums}
+  #online{margin-top:3px;font-size:12px;color:#9fe3a8}
+
+  #feed{position:fixed;top:calc(100px + env(safe-area-inset-top));right:10px;display:flex;flex-direction:column;
+    gap:6px;align-items:flex-end;pointer-events:none;z-index:4;max-width:min(330px,82vw)}
+  .toast{background:#16131ceb;border:1px solid var(--line);border-radius:10px;padding:7px 11px;font-size:13px;
+    animation:tin .25s ease-out;transition:opacity .6s}
+  .toast.big{border-color:#ffc83daa;background:#2a210eee;font-size:14px}
+  @keyframes tin{from{transform:translateX(24px);opacity:0}}
+
+  #armed{position:fixed;left:50%;transform:translateX(-50%);top:calc(100px + env(safe-area-inset-top));z-index:4;
+    background:#2a210ef0;border:1px solid #ffc83d99;padding:6px 6px 6px 12px;border-radius:12px;display:flex;gap:10px;
+    align-items:center;font-size:14px;white-space:nowrap}
+  #armed button{padding:5px 10px}
+
+  #help{position:fixed;left:50%;bottom:calc(112px + env(safe-area-inset-bottom));transform:translateX(-50%);
+    background:#000a;border:1px solid #ffffff22;padding:9px 14px;border-radius:12px;font-size:13px;
+    width:max-content;max-width:calc(100vw - 32px);box-sizing:border-box;text-align:center;pointer-events:none;transition:opacity .8s}
+  #fps{position:fixed;left:10px;bottom:calc(12px + env(safe-area-inset-bottom));font:11px ui-monospace,Menlo,monospace;
+    opacity:.55;pointer-events:none;white-space:pre;line-height:1.5}
+  #invBar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(62px + env(safe-area-inset-bottom));display:flex;gap:8px;z-index:3}
+  #invBar button{font-size:20px;padding:5px 10px;position:relative;background:#16131cdd}
+  #invBar button b{position:absolute;right:-5px;top:-7px;background:var(--gold);color:#000;font-size:10px;border-radius:8px;padding:1px 5px}
+  #invBar button.on{border-color:var(--gold);box-shadow:0 0 14px #ffc83d99}
+  #tools{position:fixed;right:10px;left:10px;bottom:calc(10px + env(safe-area-inset-bottom));display:flex;gap:6px;justify-content:flex-end;z-index:3}
+  #tools button{background:#16131cdd}
+  #bTreasure{background:#ffc83d33!important;border-color:#ffc83d99}
+
+  .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#000b;z-index:10;padding:12px}
+  .modal.open{display:flex}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;width:min(480px,100%);
+    max-height:calc(100vh - 40px);overflow:auto;box-sizing:border-box}
+  .mhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+  .mhead h2{margin:0;font-size:19px}
+  .sec{margin-top:16px;padding-top:12px;border-top:1px solid #ffffff14}
+  .sec h3{margin:0 0 8px;font-size:15px}
+  .item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #ffffff0f}
+  .item .ic{font-size:26px;width:34px;text-align:center}
+  .item .tx{flex:1;min-width:0}
+  .item .tx b{display:block}
+  .btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .records{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .rec{background:#ffffff0a;border:1px solid #ffffff14;border-radius:10px;padding:8px 10px;font-size:13px}
+  .rec b{display:block;color:var(--gold);font-size:14px;margin-top:2px}
+  .pl{padding:9px 0;border-bottom:1px solid #ffffff0f;font-size:13px}
+  .pl .nm{font-weight:700;font-size:15px}
+  .pl .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#5fd27a;margin-left:6px}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  .seg button.on{border-color:var(--gold);background:#ffc83d22}
+  input[type=range]{padding:0}
+
+  #banner .card{text-align:center;border-color:#ffc83d66;box-shadow:0 0 60px #ffc83d33}
+  #banner .big{font-size:20px;font-weight:800;color:var(--gold);margin-bottom:8px}
+
+  #auth{background:radial-gradient(circle at 50% 30%,#1d1830,#0d0f14 70%);z-index:20}
+  #auth h1{margin:0;font-size:26px;text-align:center}
+  #auth .card{width:min(380px,100%)}
+  .tabs{display:flex;gap:6px;margin:14px 0 4px}
+  .tabs button{flex:1}
+  .tabs button.on{border-color:var(--gold);background:#ffc83d22}
+  #aMsg{min-height:18px;font-size:13px;color:#ffb3b3;margin:10px 0 0;text-align:center}
+  #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:15;
+    font-size:15px;text-align:center;padding:20px}
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div id="count">Blocs restants : …</div>
+  <div id="bar"><div id="barFill"></div></div>
+  <div id="sub"></div>
+  <div id="online"></div>
+</div>
+<div id="feed"></div>
+<div id="armed" class="hidden"><span id="armedTxt"></span><button id="bDisarm">Annuler</button></div>
+<div id="help">Glisser : tourner · Pincer / molette : zoomer · Toucher / clic : frapper</div>
+<div id="fps"></div>
+<div id="invBar"></div>
+<div id="tools">
+  <button id="bTreasure" class="hidden">✨ Trésor</button>
+  <button id="bBoard" title="Classement">🏆</button>
+  <button id="bInv" title="Artefacts">🎒</button>
+  <button id="bAdmin" class="hidden" title="Administration">👑</button>
+  <button id="bSettings" title="Réglages">⚙️</button>
+</div>
+
+<div id="modal" class="modal"><div class="card">
+  <div class="mhead"><h2 id="mTitle"></h2><button id="mClose">✕</button></div>
+  <div id="mBody"></div>
+</div></div>
+
+<div id="banner" class="modal"><div class="card">
+  <div class="big">✨ Le cœur du cube est atteint ✨</div>
+  <p>Quelque chose vous attendait au centre exact du cube…</p>
+  <div class="btns" style="justify-content:center">
+    <button id="bView" class="primary">Voir le trésor</button>
+    <button id="bBannerClose">Plus tard</button>
+  </div>
+</div></div>
+
+<div id="auth" class="modal"><div class="card">
+  <h1>🧊 Le Cube</h1>
+  <p class="muted" style="text-align:center;margin:4px 0 0">Qu'y a-t-il à l'intérieur ?</p>
+  <div id="vLogin">
+    <div class="tabs"><button id="tLogin" class="on">Connexion</button><button id="tSignup">Inscription</button></div>
+    <div id="fPseudo" class="hidden"><label>Pseudo (visible par les autres)</label><input id="aPseudo" maxlength="20" autocomplete="nickname"></div>
+    <label>E-mail</label><input id="aEmail" type="email" autocomplete="email">
+    <label>Mot de passe (6 caractères minimum)</label><input id="aPass" type="password" autocomplete="current-password">
+    <div class="btns"><button id="aGo" class="primary" style="flex:1">Se connecter</button></div>
+  </div>
+  <div id="vPending" class="hidden" style="text-align:center">
+    <p style="font-size:30px;margin:16px 0 4px">⏳</p>
+    <p>Ton inscription est bien reçue.<br>Elle doit maintenant être validée par l'organisateur.</p>
+    <div class="btns" style="justify-content:center"><button id="aRefresh" class="primary">Vérifier à nouveau</button><button id="aLogout">Se déconnecter</button></div>
+  </div>
+  <div id="vRefused" class="hidden" style="text-align:center">
+    <p style="font-size:30px;margin:16px 0 4px">⛔</p>
+    <p>Ton inscription n'a pas été acceptée.</p>
+    <div class="btns" style="justify-content:center"><button id="aLogout2">Se déconnecter</button></div>
+  </div>
+  <p id="aMsg"></p>
+</div></div>
+
+<div id="loading">Chargement du cube…</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* =====================================================================
+   0. CONNEXION SUPABASE — LES DEUX SEULES LIGNES À REMPLIR
+   Laisser vide = mode solo (pour tester tout seul, sans compte).
+   ===================================================================== */
+const SUPABASE_URL = 'https://cdylpulhbbzjbyxyqizp.supabase.co';   // exemple : 'https://abcdefghijkl.supabase.co'
+const SUPABASE_KEY = 'sb_publishable_nYB5Mluv2qy_FXXCMG6Fpw_VMP36Xmo';   // la clé « publishable » (ou « anon public »)
+const ONLINE = !!(SUPABASE_URL && SUPABASE_KEY);
+
+/* =====================================================================
+   1. CONSTANTES
+   ===================================================================== */
+const MAX_HP   = 10;
+const MIN_GAP  = 0.9;                 // distance minimale caméra ↔ surface du cube
+const isMobile = matchMedia('(pointer:coarse)').matches;
+const $   = id => document.getElementById(id);
+const fmt = new Intl.NumberFormat('fr-FR');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const DIRS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+
+const ARTIFACTS = {
+  bombe:     { icon: '💣', name: 'Bombe',        desc: 'Détruit d’un coup 3×3×3 blocs (27) autour du bloc visé.', target: true },
+  foreuse:   { icon: '⚡', name: 'Laser',        desc: 'Perce un tunnel de 15 blocs dans l’axe de ta vue.', target: true },
+  megabombe: { icon: '☄️', name: 'Météore',      desc: 'Détruit 7×7×7 blocs (343). Extrêmement rare.', target: true },
+  marteau:   { icon: '🔨', name: 'Marteau d’or', desc: 'Pendant 45 secondes, chaque coup détruit un bloc entier.', target: false },
+  radar:     { icon: '📡', name: 'Radar',        desc: 'Montre pendant 90 s l’artefact caché le plus proche du centre de l’écran.', target: false },
+};
+const ART_COUNTS = { bombe: 40, foreuse: 30, marteau: 25, radar: 20, megabombe: 6 };   // pour un cube 128³
+const TREASURES = { noeud: 'Nœud doré', trophee: 'Trophée', coeur: 'Cœur de rubis', etoile: 'Étoile d’or', diamant: 'Diamant', aucun: 'Aucun objet (texte ou photo seuls)' };
+
+const settings = Object.assign({ rot: 1, zoom: 1, sound: true, fps: false },
+  (() => { try { return JSON.parse(localStorage.getItem('le-cube-settings')) || {}; } catch (e) { return {}; } })());
+const saveSettings = () => { try { localStorage.setItem('le-cube-settings', JSON.stringify(settings)); } catch (e) {} };
+
+/* ---------- état global (rempli au démarrage) ---------- */
+let N, NN, TOTAL, HALF, hp, slotOf;
+let remaining = 0, coreLo = 0, coreHi = 0, coreSize = 2, coreRemaining = 0;
+let me = null, backend = null, ready = false;
+let inventory = {};
+const myStats = { hits: 0, blocks: 0 };
+const session = { best_ms: null, cps: 0, deep: 0 };
+let hammerUntil = 0, armed = null;
+let onlineNames = [];
+
+/* =====================================================================
+   2. SCÈNE 3D
+   ===================================================================== */
+const renderer = new THREE.WebGLRenderer({ antialias: !isMobile, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, isMobile ? 1.6 : 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.prepend(renderer.domElement);
+const canvas = renderer.domElement;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0d0f14);
+scene.add(new THREE.HemisphereLight(0xfff6e0, 0x3a2a18, 1.6));      // lumières du trésor uniquement
+const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(2, 4, 3); scene.add(sun);
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.05, 2000);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.1;
+controls.enablePan = false;
+controls.enableZoom = false;        // zoom fait maison (plus fin près de la surface)
+
+function defaultDistance() {
+  const vfov = THREE.MathUtils.degToRad(camera.fov);
+  const hfov = 2 * Math.atan(Math.tan(vfov / 2) * camera.aspect);
+  return (N * 0.95) / Math.sin(Math.min(vfov, hfov) / 2);
+}
+
+/* ---------- Shader des faces de blocs ----------
+   Couleur ET texture différentes pour chaque couche, calculées par la carte
+   graphique (aucune image à charger). 8 motifs × couleurs uniques par couche. */
+let blockMat;
+function makeBlockMaterial() {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uHalf:      { value: HALF },
+      uHover:     { value: new THREE.Vector3(-99, -99, -99) },
+      uFlashCell: { value: new THREE.Vector3(-99, -99, -99) },
+      uFlash:     { value: 0 },
+    },
+    vertexShader: /* glsl */`
+      attribute float aDamage;
+      uniform float uHalf;
+      uniform vec3  uHover;
+      uniform vec3  uFlashCell;
+      uniform float uFlash;
+      varying vec3  vN;
+      varying vec3  vW;
+      varying vec2  vUv2;
+      varying vec3  vCell;
+      varying float vDamage;
+      varying float vHi;
+      void main() {
+        vCell = floor(instanceMatrix[3].xyz + uHalf + 0.5);
+        vN = normal;
+        vUv2 = uv;
+        vDamage = aDamage;
+        vec3 dh = abs(vCell - uHover);
+        vec3 df = abs(vCell - uFlashCell);
+        float isH = max(dh.x, max(dh.y, dh.z)) < 0.5 ? 1.0 : 0.0;
+        float isF = max(df.x, max(df.y, df.z)) < 0.5 ? 1.0 : 0.0;
+        vHi = isH * 0.10 + isF * uFlash * 0.35;
+        vec3 p = position * (1.0 - isF * uFlash * 0.08);
+        vec4 wp = instanceMatrix * vec4(p, 1.0);
+        vW = wp.xyz + uHalf + 0.5;
+        gl_Position = projectionMatrix * modelViewMatrix * wp;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform float uHalf;
+      varying vec3  vN;
+      varying vec3  vW;
+      varying vec2  vUv2;
+      varying vec3  vCell;
+      varying float vDamage;
+      varying float vHi;
+
+      float hash13(vec3 p) { p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
+      float h21(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+      vec2 hash22(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * vec3(.1031, .1030, .0973));
+        p3 += dot(p3, p3.yzx + 33.33); return fract((p3.xx + p3.yz) * p3.zy); }
+      float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
+        return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), u.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), u.x), u.y); }
+      float fbm(vec2 p) { return 0.6 * vnoise(p) + 0.3 * vnoise(p * 2.03 + 7.1) + 0.1 * vnoise(p * 4.1 + 3.3); }
+      vec3 hsv2rgb(vec3 c) { vec3 p = abs(fract(c.xxx + vec3(0., 2./3., 1./3.)) * 6. - 3.);
+        return c.z * mix(vec3(1.), clamp(p - 1., 0., 1.), c.y); }
+      // fissures : branches qui partent d'un point d'impact, plus nombreuses et longues avec les dégâts
+      float crackDist(vec2 uv, vec3 sd, float dmg) {
+        vec2 q = uv - (0.5 + (vec2(hash13(sd), hash13(sd + 1.7)) - 0.5) * 0.4);
+        float best = 1.0;
+        for (int k = 0; k < 7; k++) {
+          float fk = float(k);
+          if (fk > 1.0 + dmg * 7.0) break;
+          float a = hash13(sd + fk * 3.1) * 6.2832;
+          vec2 dir = vec2(cos(a), sin(a));
+          float along = dot(q, dir);
+          float len = (0.3 + 0.5 * hash13(sd + fk * 5.3)) * (0.35 + dmg);
+          if (along < 0.0 || along > len) continue;
+          float wig = sin(along * 26.0 + fk * 2.0) * 0.025 + sin(along * 63.0 + fk) * 0.01;
+          float perp = abs(dot(q, vec2(-dir.y, dir.x)) + wig * along * 3.0);
+          best = min(best, perp / max(1.0 - along / len, 0.15));
+        }
+        return best;
+      }
+
+      void main() {
+        vec3 d3 = abs(vCell - uHalf);
+        float depth = floor(uHalf - max(d3.x, max(d3.y, d3.z)) + 0.5);
+        // coordonnées continues sur la face (en blocs) : les motifs se prolongent d'un bloc à l'autre
+        vec2 p = abs(vN.x) > 0.5 ? vW.zy : (abs(vN.y) > 0.5 ? vW.xz : vW.xy);
+        vec3 col;
+        if (depth < 0.5) {
+          // couche extérieure : marbre blanc veiné
+          float v = sin(p.x * 0.9 + p.y * 0.4 + fbm(p * 0.35) * 7.0);
+          col = vec3(0.93, 0.93, 0.95) * (0.9 + 0.1 * fbm(p * 2.0));
+          col = mix(col, vec3(0.60, 0.65, 0.74), pow(1.0 - abs(v), 6.0) * 0.6);
+        } else {
+          col = hsv2rgb(vec3(fract(0.07 + depth * 0.618034), 0.5 + 0.125 * mod(depth, 3.0), 0.82 + 0.1 * mod(depth + 1.0, 2.0)));
+          float id = mod(depth - 1.0, 8.0);
+          if (id < 0.5) {                       // pierre
+            col *= 0.78 + 0.35 * fbm(p * 1.7);
+          } else if (id < 1.5) {                // briques
+            vec2 q = p * vec2(1.0, 2.0); q.x += 0.5 * mod(floor(q.y), 2.0); vec2 f = fract(q);
+            float m = step(0.06, f.x) * step(0.10, f.y);
+            col *= mix(0.55, 0.92 + 0.16 * h21(floor(q)), m);
+          } else if (id < 2.5) {                // bois
+            float r = fract((p.x * 0.7 + fbm(p * vec2(0.4, 2.5)) * 1.6) * 2.5);
+            col *= 0.75 + 0.3 * smoothstep(0.0, 0.6, r) * (1.0 - smoothstep(0.6, 1.0, r)) + 0.08 * vnoise(p * vec2(0.6, 12.0));
+          } else if (id < 3.5) {                // marbre coloré
+            float v = sin(p.x * 1.3 + p.y * 0.7 + fbm(p * 0.5) * 6.0);
+            col = mix(col * 0.85, vec3(1.0), pow(1.0 - abs(v), 8.0) * 0.55);
+          } else if (id < 4.5) {                // carrelage
+            float c = mod(floor(p.x * 2.0) + floor(p.y * 2.0), 2.0);
+            vec2 f = fract(p * 2.0); float j = step(0.05, f.x) * step(0.05, f.y);
+            col *= mix(0.6, 0.86 + 0.18 * c, j);
+          } else if (id < 5.5) {                // picots
+            float d = length(fract(p * 2.0) - 0.5);
+            col *= mix(1.15, 0.85, smoothstep(0.17, 0.24, d));
+          } else if (id < 6.5) {                // rayures
+            col *= 0.86 + 0.16 * step(0.5, fract((p.x + p.y) * 1.5));
+          } else {                              // cristal scintillant
+            col *= 0.75 + 0.45 * h21(floor(p * 3.0));
+            col += vec3(0.25) * step(0.985, h21(floor(p * 12.0)));
+          }
+        }
+        col *= 0.95 + 0.05 * hash13(vCell);
+
+        // dégâts : assombrissement + fissures qui s'étendent
+        col *= 1.0 - 0.6 * vDamage;
+        if (vDamage > 0.001) {
+          float d = crackDist(vUv2, vCell * 1.37 + vN * 7.0, vDamage);
+          float w = 0.012 + 0.02 * vDamage, aa = fwidth(d) + 0.002;
+          col = mix(col, col * 0.12, 1.0 - smoothstep(w - aa, w + aa, d));
+        }
+
+        // liseré des blocs, estompé quand les blocs sont minuscules à l'écran (évite le moiré)
+        float edge = min(min(vUv2.x, 1.0 - vUv2.x), min(vUv2.y, 1.0 - vUv2.y));
+        float fw = max(fwidth(vUv2.x), fwidth(vUv2.y));
+        float outline = (1.0 - smoothstep(0.0, 0.07, edge)) * (1.0 - smoothstep(0.04, 0.16, fw));
+        col *= 1.0 - 0.28 * outline;
+        vec3 L1 = normalize(vec3(0.5, 0.85, 0.35));
+        vec3 L2 = normalize(vec3(-0.6, 0.2, -0.75));
+        col *= 0.42 + 0.5 * max(dot(vN, L1), 0.0) + 0.22 * max(dot(vN, L2), 0.0);
+        col += vHi;
+        gl_FragColor = vec4(col, 1.0);
+      }`,
+  });
+}
+
+/* =====================================================================
+   3. RENDU PAR FACES VISIBLES
+   On n'affiche pas des cubes entiers mais seulement les FACES exposées,
+   rangées dans 6 InstancedMesh (une par orientation). Une face tournée
+   à l'opposé de la caméra n'est même pas envoyée à la carte graphique.
+   Pour un cube 128³ : ~98 000 faces au total, ~49 000 dessinées.
+   ===================================================================== */
+const F = DIRS.map((d, f) => ({ f, mesh: null, dmg: null, cap: 0, used: 0, free: [], dirty: [], full: false }));
+let recFace = new Int32Array(0), recCap = 0, recUsed = 0, recFree = [];
+
+function faceGeometry(f) {
+  const g = new THREE.PlaneGeometry(1, 1);
+  if (f === 0) g.rotateY(Math.PI / 2);
+  else if (f === 1) g.rotateY(-Math.PI / 2);
+  else if (f === 2) g.rotateX(-Math.PI / 2);
+  else if (f === 3) g.rotateX(Math.PI / 2);
+  else if (f === 5) g.rotateY(Math.PI);
+  const d = DIRS[f];
+  g.translate(d[0] * 0.5, d[1] * 0.5, d[2] * 0.5);
+  return g;
+}
+function growFaces(S, need) {
+  let cap = Math.max(2048, S.cap);
+  while (cap < need) cap *= 2;
+  const geo = faceGeometry(S.f);
+  const dmg = new THREE.InstancedBufferAttribute(new Float32Array(cap), 1);
+  dmg.setUsage(THREE.DynamicDrawUsage);
+  geo.setAttribute('aDamage', dmg);
+  const m = new THREE.InstancedMesh(geo, blockMat, cap);
+  m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  m.frustumCulled = false;
+  if (S.mesh) {
+    m.instanceMatrix.array.set(S.mesh.instanceMatrix.array.subarray(0, S.used * 16));
+    dmg.array.set(S.dmg.array.subarray(0, S.used));
+    m.visible = S.mesh.visible;
+    scene.remove(S.mesh); S.mesh.geometry.dispose(); S.mesh.dispose();
+  }
+  S.mesh = m; S.dmg = dmg; S.cap = cap; m.count = S.used;
+  scene.add(m);
+  S.full = true; S.dirty.length = 0;
+}
+function newRecord(i) {
+  let r;
+  if (recFree.length) r = recFree.pop();
+  else {
+    if (recUsed >= recCap) {
+      const nc = Math.max(8192, recCap * 2), a = new Int32Array(nc * 6).fill(-1);
+      a.set(recFace); recFace = a; recCap = nc;
+    }
+    r = recUsed++;
+  }
+  recFace.fill(-1, r * 6, r * 6 + 6);
+  slotOf[i] = r;
+  return r;
+}
+function addFace(i, f) {
+  let r = slotOf[i];
+  if (r < 0) r = newRecord(i);
+  if (recFace[r * 6 + f] >= 0) return;
+  const S = F[f];
+  let s;
+  if (S.free.length) s = S.free.pop();
+  else { if (S.used >= S.cap) growFaces(S, S.used + 1); s = S.used++; S.mesh.count = S.used; }
+  recFace[r * 6 + f] = s;
+  const x = i % N, y = ((i / N) | 0) % N, z = (i / NN) | 0;
+  const a = S.mesh.instanceMatrix.array, o = s * 16;
+  a[o] = 1; a[o + 1] = 0; a[o + 2] = 0; a[o + 3] = 0;
+  a[o + 4] = 0; a[o + 5] = 1; a[o + 6] = 0; a[o + 7] = 0;
+  a[o + 8] = 0; a[o + 9] = 0; a[o + 10] = 1; a[o + 11] = 0;
+  a[o + 12] = x - HALF; a[o + 13] = y - HALF; a[o + 14] = z - HALF; a[o + 15] = 1;
+  S.dmg.array[s] = (MAX_HP - hp[i]) / MAX_HP;
+  S.dirty.push(s);
+}
+function removeFace(i, f) {
+  const r = slotOf[i];
+  if (r < 0) return;
+  const s = recFace[r * 6 + f];
+  if (s < 0) return;
+  const S = F[f];
+  S.mesh.instanceMatrix.array.fill(0, s * 16, s * 16 + 16);   // matrice nulle = invisible
+  S.free.push(s); S.dirty.push(s);
+  recFace[r * 6 + f] = -1;
+  for (let k = 0; k < 6; k++) if (recFace[r * 6 + k] >= 0) return;
+  recFree.push(r); slotOf[i] = -1;
+}
+function setDamage(i) {
+  const r = slotOf[i];
+  if (r < 0) return;
+  for (let f = 0; f < 6; f++) {
+    const s = recFace[r * 6 + f];
+    if (s >= 0) { F[f].dmg.array[s] = (MAX_HP - hp[i]) / MAX_HP; F[f].dirty.push(s); }
+  }
+}
+function neighbor(i, f) {
+  const x = i % N, y = ((i / N) | 0) % N, z = (i / NN) | 0;
+  switch (f) {
+    case 0: return x < N - 1 ? i + 1 : -1;
+    case 1: return x > 0 ? i - 1 : -1;
+    case 2: return y < N - 1 ? i + N : -1;
+    case 3: return y > 0 ? i - N : -1;
+    case 4: return z < N - 1 ? i + NN : -1;
+    default: return z > 0 ? i - NN : -1;
+  }
+}
+function buildAllFaces() {
+  for (const S of F) growFaces(S, Math.ceil(N * N * 1.3));
+  let i = 0;
+  for (let z = 0; z < N; z++) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++, i++) {
+    if (hp[i] === 0) continue;
+    if (x === N - 1 || hp[i + 1] === 0) addFace(i, 0);
+    if (x === 0 || hp[i - 1] === 0) addFace(i, 1);
+    if (y === N - 1 || hp[i + N] === 0) addFace(i, 2);
+    if (y === 0 || hp[i - N] === 0) addFace(i, 3);
+    if (z === N - 1 || hp[i + NN] === 0) addFace(i, 4);
+    if (z === 0 || hp[i - NN] === 0) addFace(i, 5);
+  }
+  for (const S of F) S.full = true;
+}
+function flushFaces() {
+  for (const S of F) {
+    if (!S.full && !S.dirty.length) continue;
+    const im = S.mesh.instanceMatrix;
+    im.clearUpdateRanges(); S.dmg.clearUpdateRanges();
+    if (!S.full && S.dirty.length <= 128) {
+      for (const s of S.dirty) { im.addUpdateRange(s * 16, 16); S.dmg.addUpdateRange(s, 1); }
+    }
+    im.needsUpdate = true; S.dmg.needsUpdate = true;
+    S.dirty.length = 0; S.full = false;
+  }
+}
+// Une face +x n'est visible que si la caméra est du côté +x de son plan, etc.
+function cullFaces() {
+  const c = camera.position, lim = HALF - 0.5 + 1e-3, show = !treasureView;
+  F[0].mesh.visible = show && c.x > -lim; F[1].mesh.visible = show && c.x < lim;
+  F[2].mesh.visible = show && c.y > -lim; F[3].mesh.visible = show && c.y < lim;
+  F[4].mesh.visible = show && c.z > -lim; F[5].mesh.visible = show && c.z < lim;
+}
+const cubeHidden = () => treasureView;
+
+/* =====================================================================
+   4. PARTICULES
+   ===================================================================== */
+const PMAX = 500;
+const parts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), new THREE.MeshBasicMaterial(), PMAX);
+parts.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(PMAX * 3), 3);
+parts.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+parts.frustumCulled = false; parts.count = 0;
+scene.add(parts);
+const pList = [];
+const _dummy = new THREE.Object3D(), _col = new THREE.Color();
+function hsv(h, s, v) {
+  const f = n => { const k = (n + h * 6) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
+  return [f(5), f(3), f(1)];
+}
+function depthOf(i) {
+  const x = i % N, y = ((i / N) | 0) % N, z = (i / NN) | 0;
+  return Math.floor(HALF - Math.max(Math.abs(x - HALF), Math.abs(y - HALF), Math.abs(z - HALF)) + 0.5);
+}
+function layerRGB(depth) {
+  if (depth === 0) return [0.7, 0.7, 0.72];
+  const [r, g, b] = hsv(((0.07 + depth * 0.618034) % 1), 0.5 + 0.125 * (depth % 3), 0.82 + 0.1 * ((depth + 1) % 2));
+  return [r * 0.8, g * 0.8, b * 0.8];
+}
+function spawnParticles(i, count = 8) {
+  const x = i % N - HALF, y = ((i / N) | 0) % N - HALF, z = ((i / NN) | 0) - HALF;
+  const [r, g, b] = layerRGB(depthOf(i));
+  for (let k = 0; k < count && pList.length < PMAX; k++) {
+    pList.push({ x: x + (Math.random() - 0.5) * 0.6, y: y + (Math.random() - 0.5) * 0.6, z: z + (Math.random() - 0.5) * 0.6,
+      vx: (Math.random() - 0.5) * 6, vy: Math.random() * 5 + 1, vz: (Math.random() - 0.5) * 6,
+      life: 0.5 + Math.random() * 0.4, max: 0.9, r, g, b, rot: Math.random() * 6 });
+  }
+}
+function updateParticles(dt) {
+  let n = 0;
+  for (let k = 0; k < pList.length; k++) {
+    const p = pList[k];
+    p.life -= dt;
+    if (p.life <= 0) continue;
+    p.vy -= 16 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.rot += dt * 8;
+    pList[n] = p;
+    _dummy.position.set(p.x, p.y, p.z);
+    _dummy.rotation.set(p.rot, p.rot * 0.7, 0);
+    _dummy.scale.setScalar(Math.max(0.01, p.life / p.max));
+    _dummy.updateMatrix();
+    parts.setMatrixAt(n, _dummy.matrix);
+    _col.setRGB(p.r, p.g, p.b, THREE.SRGBColorSpace);
+    parts.setColorAt(n, _col);
+    n++;
+  }
+  pList.length = n; parts.count = n;
+  parts.instanceMatrix.needsUpdate = true; parts.instanceColor.needsUpdate = true;
+}
+
+/* ---------- Balise du radar ---------- */
+let beacon = null, beaconUntil = 0;
+function showBeacon(i) {
+  if (!beacon) {
+    beacon = new THREE.Group();
+    const box = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2),
+      new THREE.MeshBasicMaterial({ color: 0xffd34d, transparent: true, opacity: 0.45, depthTest: false, depthWrite: false }));
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1.5, 1.5, 1.5)),
+      new THREE.LineBasicMaterial({ color: 0xfff0b0, transparent: true, depthTest: false }));
+    box.renderOrder = edges.renderOrder = 999;
+    beacon.add(box, edges);
+    scene.add(beacon);
+  }
+  beacon.position.set(i % N - HALF, ((i / N) | 0) % N - HALF, ((i / NN) | 0) - HALF);
+  beacon.visible = true;
+  beaconUntil = performance.now() + 90000;
+}
+
+/* =====================================================================
+   5. TRÉSOR
+   ===================================================================== */
+let envTex = null, treasureObj = null, treasureRevealed = false, treasureView = false, previewMode = false;
+function getEnv() {
+  if (!envTex) { const pm = new THREE.PMREMGenerator(renderer); envTex = pm.fromScene(new RoomEnvironment(), 0.04).texture; pm.dispose(); }
+  return envTex;
+}
+const goldMat = () => new THREE.MeshStandardMaterial({ color: 0xffcf4a, metalness: 0.88, roughness: 0.26, envMap: getEnv(), envMapIntensity: 1.6, emissive: 0x4a3000 });
+const gemMat = () => new THREE.MeshStandardMaterial({ color: 0xfff4c4, metalness: 0.2, roughness: 0.05, envMap: getEnv(), emissive: 0x5a3c00 });
+
+function centerObject(g) {
+  const c = new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3());
+  g.children.forEach(ch => ch.position.sub(c));
+  return g;
+}
+function makeShape(kind) {
+  const g = new THREE.Group();
+  if (kind === 'trophee') {
+    const gold = goldMat();
+    const prof = [[0, 0], [0.42, 0], [0.42, 0.07], [0.14, 0.12], [0.08, 0.36], [0.1, 0.46], [0.36, 0.6], [0.46, 1.0], [0.42, 1.03], [0.34, 0.66], [0, 0.56]]
+      .map(([x, y]) => new THREE.Vector2(x, y));
+    g.add(new THREE.Mesh(new THREE.LatheGeometry(prof, 48), gold));
+    for (const sgn of [1, -1]) {
+      const h = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.035, 12, 32, Math.PI), gold);
+      h.position.set(sgn * 0.44, 0.78, 0); h.rotation.z = -sgn * Math.PI / 2;
+      g.add(h);
+    }
+  } else if (kind === 'coeur') {
+    const s = new THREE.Shape();
+    s.moveTo(0, -0.55);
+    s.bezierCurveTo(-0.35, -0.25, -0.6, 0.0, -0.55, 0.25);
+    s.bezierCurveTo(-0.5, 0.5, -0.15, 0.55, 0, 0.3);
+    s.bezierCurveTo(0.15, 0.55, 0.5, 0.5, 0.55, 0.25);
+    s.bezierCurveTo(0.6, 0.0, 0.35, -0.25, 0, -0.55);
+    const geo = new THREE.ExtrudeGeometry(s, { depth: 0.22, bevelEnabled: true, bevelThickness: 0.08, bevelSize: 0.06, bevelSegments: 5, curveSegments: 28 });
+    g.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xd2143c, metalness: 0.35, roughness: 0.12, envMap: getEnv(), emissive: 0x2a0008 })));
+  } else if (kind === 'etoile') {
+    const s = new THREE.Shape();
+    for (let k = 0; k < 10; k++) {
+      const a = Math.PI / 2 + k * Math.PI / 5, r = k % 2 ? 0.26 : 0.62;
+      k ? s.lineTo(Math.cos(a) * r, Math.sin(a) * r) : s.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    s.closePath();
+    g.add(new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: 0.18, bevelEnabled: true, bevelThickness: 0.07, bevelSize: 0.05, bevelSegments: 3 }), goldMat()));
+  } else if (kind === 'diamant') {
+    const m = new THREE.MeshStandardMaterial({ color: 0xd8f3ff, metalness: 0.15, roughness: 0.02, envMap: getEnv(), flatShading: true, emissive: 0x0c1a26 });
+    const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.56, 0.24, 8, 1), m); crown.position.y = 0.12;
+    const pav = new THREE.Mesh(new THREE.ConeGeometry(0.56, 0.62, 8), m); pav.rotation.x = Math.PI; pav.position.y = -0.31;
+    g.add(crown, pav);
+  } else {
+    g.add(new THREE.Mesh(new THREE.TorusKnotGeometry(0.4, 0.115, 200, 24, 2, 3), goldMat()));
+    g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.18, 0), gemMat()));
+    const orbs = new THREE.Group();
+    for (let j = 0; j < 6; j++) {
+      const o = new THREE.Mesh(new THREE.OctahedronGeometry(0.05, 0), gemMat());
+      const a = (j / 6) * Math.PI * 2;
+      o.position.set(Math.cos(a) * 0.62, Math.sin(a * 2) * 0.1, Math.sin(a) * 0.62);
+      orbs.add(o);
+    }
+    g.add(orbs); g.userData.orbs = orbs;
+  }
+  return g.userData.orbs ? g : centerObject(g);
+}
+function makePlaque(text) {
+  const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 320;
+  const c = cv.getContext('2d');
+  const gr = c.createLinearGradient(0, 0, 0, 320);
+  gr.addColorStop(0, '#ffe28a'); gr.addColorStop(0.5, '#e0a92c'); gr.addColorStop(1, '#a8741a');
+  c.fillStyle = gr; c.fillRect(0, 0, 1024, 320);
+  c.strokeStyle = '#7a5210'; c.lineWidth = 10; c.strokeRect(18, 18, 988, 284);
+  let size = 130, lines;
+  const wrap = sz => {
+    c.font = `800 ${sz}px Georgia, "Times New Roman", serif`;
+    const out = []; let cur = '';
+    for (const w of text.split(/\s+/)) {
+      const t = cur ? cur + ' ' + w : w;
+      if (c.measureText(t).width > 900 && cur) { out.push(cur); cur = w; } else cur = t;
+    }
+    if (cur) out.push(cur);
+    return out;
+  };
+  for (; size > 26; size -= 6) {
+    lines = wrap(size);
+    if (lines.length * size * 1.12 < 250 && lines.every(l => c.measureText(l).width <= 920)) break;
+  }
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  const y0 = 160 - (lines.length - 1) * size * 0.56;
+  lines.forEach((l, k) => {
+    c.fillStyle = '#fff6d8aa'; c.fillText(l, 513, y0 + k * size * 1.12 + 3);
+    c.fillStyle = '#3a2408'; c.fillText(l, 512, y0 + k * size * 1.12);
+  });
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  const gold = goldMat();
+  const front = new THREE.MeshStandardMaterial({ map: tex, metalness: 0.45, roughness: 0.35, envMap: getEnv() });
+  return new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 0.06), [gold, gold, gold, gold, front, gold]);
+}
+async function makePhoto(url) {
+  const tex = await new THREE.TextureLoader().loadAsync(url);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const ar = tex.image.width / tex.image.height;
+  let h = 1.0, w = h * ar;
+  if (w > 1.5) { w = 1.5; h = w / ar; }
+  const g = new THREE.Group(), gold = goldMat(), t = 0.07;
+  g.add(new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex })));
+  const back = new THREE.Mesh(new THREE.BoxGeometry(w + t * 2, h + t * 2, 0.04), new THREE.MeshStandardMaterial({ color: 0x2a1a08 }));
+  back.position.z = -0.03; g.add(back);
+  for (const [px, py, bw, bh] of [[0, h / 2 + t / 2, w + 2 * t, t], [0, -h / 2 - t / 2, w + 2 * t, t], [w / 2 + t / 2, 0, t, h], [-w / 2 - t / 2, 0, t, h]]) {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.08), gold); b.position.set(px, py, 0.01); g.add(b);
+  }
+  return g;
+}
+async function buildTreasure(cfg) {
+  const root = new THREE.Group(), items = [], sway = [];
+  let spin = null;
+  if (cfg.image) {
+    try { const p = await makePhoto(await backend.imageUrl(cfg.image)); items.push(p); sway.push(p); }
+    catch (e) { console.warn('photo du trésor', e); }
+  }
+  if (cfg.kind && cfg.kind !== 'aucun') { spin = makeShape(cfg.kind); items.push(spin); }
+  const msg = (cfg.message || '').trim();
+  if (msg) { const pl = makePlaque(msg); items.push(pl); sway.push(pl); }
+  if (!items.length) { spin = makeShape('noeud'); items.push(spin); }
+  const boxes = items.map(o => new THREE.Box3().setFromObject(o));
+  const gap = 0.16;
+  const total = boxes.reduce((s, b) => s + b.max.y - b.min.y, 0) + gap * (items.length - 1);
+  let y = total / 2, maxW = 0;
+  items.forEach((o, k) => {
+    const b = boxes[k], h = b.max.y - b.min.y, cy = (b.max.y + b.min.y) / 2;
+    o.position.y += (y - h / 2) - cy;
+    y -= h + gap;
+    maxW = Math.max(maxW, b.max.x - b.min.x, b.max.z - b.min.z);
+    root.add(o);
+  });
+  root.scale.setScalar(coreSize * 0.85 / Math.max(total, maxW));
+  return { root, spin, sway };
+}
+function disposeTreasure() {
+  if (!treasureObj) return;
+  scene.remove(treasureObj.root);
+  treasureObj.root.traverse(o => {
+    o.geometry?.dispose();
+    for (const m of [].concat(o.material || [])) { m.map?.dispose(); m.dispose(); }
+  });
+  treasureObj = null;
+}
+async function showTreasure(cfg) {
+  disposeTreasure();
+  treasureObj = await buildTreasure(cfg);
+  scene.add(treasureObj.root);
+  requestRender();
+}
+function setTreasureView(on) {
+  treasureView = on;
+  if (on) camera.position.setLength(coreSize * 2);
+  else {
+    camera.position.setLength(defaultDistance());
+    if (previewMode && !treasureRevealed) disposeTreasure();
+    previewMode = false;
+  }
+  $('bTreasure').textContent = on ? '🧊 Cube' : '✨ Trésor';
+  $('bTreasure').classList.toggle('hidden', !(on || treasureRevealed));
+  cullFaces();
+  requestRender();
+}
+async function onCoreDone(withBanner) {
+  if (treasureRevealed) return;
+  for (let k = 0; k < 6; k++) {
+    try {
+      const cfg = await backend.getTreasure();
+      if (cfg) {
+        treasureRevealed = true; previewMode = false;
+        await showTreasure(cfg);
+        $('bTreasure').classList.remove('hidden');
+        if (withBanner) { $('banner').classList.add('open'); sfx('treasure'); }
+        return;
+      }
+    } catch (e) { console.warn(e); }
+    await sleep(2500);
+  }
+}
+
+/* =====================================================================
+   6. LOGIQUE DES BLOCS (même fonction pour mes coups, ceux des amis et les artefacts)
+   ===================================================================== */
+const isCore = i => {
+  const x = i % N, y = ((i / N) | 0) % N, z = (i / NN) | 0;
+  return x >= coreLo && x <= coreHi && y >= coreLo && y <= coreHi && z >= coreLo && z <= coreHi;
+};
+let hudDirty = true;
+function setHp(i, v, origin) {
+  if (!(v < hp[i])) return false;       // les PV ne remontent jamais
+  hp[i] = v;
+  if (v === 0) {
+    remaining--;
+    for (let f = 0; f < 6; f++) removeFace(i, f);
+    for (let f = 0; f < 6; f++) { const j = neighbor(i, f); if (j >= 0 && hp[j] > 0) addFace(j, f ^ 1); }
+    spawnParticles(i, origin === 'art' ? 2 : 8);
+    if (isCore(i) && --coreRemaining === 0) onCoreDone(true);
+  } else setDamage(i);
+  hudDirty = true;
+  requestRender();
+  backend?.changed?.();
+  return true;
+}
+
+/* ---------- mes coups ---------- */
+const firstHits = new Map();
+const hitTimes = [];
+function playerHit(i) {
+  if (!ready || hp[i] === 0) return;
+  const now = performance.now();
+  const dmg = now < hammerUntil ? MAX_HP : 1;
+  myStats.hits += dmg;
+  hitTimes.push(now);
+  while (hitTimes.length && now - hitTimes[0] > 10000) hitTimes.shift();
+  session.cps = Math.max(session.cps, hitTimes.length);
+  let rec = firstHits.get(i);
+  if (!rec) { rec = { t: now, n: 0, hammer: false }; firstHits.set(i, rec); if (firstHits.size > 4000) firstHits.delete(firstHits.keys().next().value); }
+  rec.n += dmg; if (dmg > 1) rec.hammer = true;
+  const nv = Math.max(0, hp[i] - dmg);
+  setHp(i, nv, 'me');
+  if (nv === 0) {
+    myStats.blocks++;
+    if (!rec.hammer && rec.n >= MAX_HP) {
+      const ms = Math.round(now - rec.t);
+      if (session.best_ms == null || ms < session.best_ms) session.best_ms = ms;
+    }
+    firstHits.delete(i);
+    session.deep = Math.max(session.deep, depthOf(i));
+    sfx('break'); navigator.vibrate?.(12);
+  } else {
+    blockMat.uniforms.uFlashCell.value.set(i % N, ((i / N) | 0) % N, (i / NN) | 0);
+    flash = 1; sfx('hit');
+  }
+  queueHit(i, dmg);
+}
+
+/* ---------- envoi groupé des coups (au plus 1 message par seconde et par joueur) ---------- */
+const pending = new Map();
+let flushTimer = null;
+function queueHit(i, n) {
+  pending.set(i, (pending.get(i) || 0) + n);
+  if (!flushTimer) flushTimer = setTimeout(flushHits, 1000);
+}
+async function flushHits() {
+  flushTimer = null;
+  if (!pending.size) return;
+  const list = [...pending]; pending.clear();
+  try {
+    const res = await backend.hit(list, { best_ms: session.best_ms, cps: session.cps, deep: session.deep });
+    const flat = [];
+    for (const [i, v, art] of res || []) {
+      setHp(i, v, 'net');
+      flat.push(i, v);
+      if (art) gotArtifact(art);
+    }
+    if (flat.length) backend.send('hits', { r: flat });
+  } catch (e) {
+    toast('⚠️ Coups non enregistrés : ' + e.message);
+  }
+}
+function gotArtifact(kind) {
+  const A = ARTIFACTS[kind]; if (!A) return;
+  inventory[kind] = (inventory[kind] || 0) + 1;
+  renderInvBar();
+  toast(`🎉 Tu as trouvé : ${A.icon} ${A.name} !`, true);
+  sfx('treasure');
+  backend.send('feed', { text: `🎉 ${me.pseudo} a trouvé ${A.icon} ${A.name} !` });
+}
+
+/* ---------- artefacts ---------- */
+function arm(kind) {
+  armed = kind;
+  const A = ARTIFACTS[kind];
+  $('armedTxt').textContent = `${A.icon} ${A.name} prêt : touche un bloc`;
+  $('armed').classList.remove('hidden');
+  renderInvBar();
+}
+function disarm() { armed = null; $('armed').classList.add('hidden'); renderInvBar(); }
+function viewDir() {
+  const d = camera.position.clone().negate().normalize(), a = [Math.abs(d.x), Math.abs(d.y), Math.abs(d.z)];
+  const ax = a[0] >= a[1] && a[0] >= a[2] ? 0 : (a[1] >= a[2] ? 1 : 2);
+  return ax * 2 + (d.getComponent(ax) > 0 ? 0 : 1);
+}
+async function useArtifact(kind, target) {
+  if (!(inventory[kind] > 0)) return;
+  disarm();
+  const A = ARTIFACTS[kind];
+  let center = target;
+  if (center == null || center < 0) {
+    center = pickBlock(innerWidth / 2, innerHeight / 2);
+    if (center < 0) center = Math.floor(HALF) * (1 + N + NN);
+  }
+  try {
+    const res = await backend.use(kind, center, kind === 'foreuse' ? viewDir() : 0);
+    inventory[kind]--; renderInvBar();
+    const list = res.destroyed || [];
+    for (const i of list) { setHp(i, 0, 'art'); session.deep = Math.max(session.deep, depthOf(i)); }
+    myStats.blocks += list.length;
+    for (const f of res.found || []) gotArtifact(f.kind);
+    if (kind === 'marteau') hammerUntil = performance.now() + 45000;
+    if (kind === 'radar') {
+      if (res.radar >= 0) {
+        showBeacon(res.radar);
+        toast(`📡 Un artefact se cache en couche ${depthOf(res.radar) + 1} (balise dorée pendant 90 s)`, true);
+      } else toast('📡 Plus aucun artefact caché !', true);
+    }
+    if (list.length) { sfx('boom'); navigator.vibrate?.([20, 40, 30]); backend.send('hits', { r: list.flatMap(i => [i, 0]) }); }
+    const extra = list.length ? ` : ${fmt.format(list.length)} blocs pulvérisés` : '';
+    toast(`${A.icon} ${A.name}${extra || ' activé'}`, true);
+    backend.send('feed', { text: `${A.icon} ${me.pseudo} a utilisé : ${A.name}${extra}` });
+    hudDirty = true;
+  } catch (e) { toast('⚠️ ' + e.message); }
+}
+
+/* =====================================================================
+   7. VISÉE (parcours de la grille case par case, instantané)
+   ===================================================================== */
+const _rc = new THREE.Raycaster(), _ndc = new THREE.Vector2();
+let ddaT = 0;
+function pickBlock(cx, cy) {
+  if (cubeHidden()) return -1;
+  const r = canvas.getBoundingClientRect();
+  _ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+  _rc.setFromCamera(_ndc, camera);
+  const o = _rc.ray.origin, d = _rc.ray.direction, G = N / 2;
+  return dda(o.x + G, o.y + G, o.z + G, d.x, d.y, d.z);
+}
+function dda(ox, oy, oz, dx, dy, dz) {
+  let tmin = 0, tmax = 1e9;
+  const O = [ox, oy, oz], D = [dx, dy, dz];
+  for (let a = 0; a < 3; a++) {
+    if (Math.abs(D[a]) < 1e-12) { if (O[a] < 0 || O[a] > N) return -1; }
+    else {
+      let t1 = -O[a] / D[a], t2 = (N - O[a]) / D[a];
+      if (t1 > t2) { const tt = t1; t1 = t2; t2 = tt; }
+      if (t1 > tmin) tmin = t1;
+      if (t2 < tmax) tmax = t2;
+    }
+  }
+  if (tmin > tmax) return -1;
+  const t0 = tmin + 1e-5;
+  const px = ox + dx * t0, py = oy + dy * t0, pz = oz + dz * t0;
+  let x = Math.min(N - 1, Math.max(0, Math.floor(px)));
+  let y = Math.min(N - 1, Math.max(0, Math.floor(py)));
+  let z = Math.min(N - 1, Math.max(0, Math.floor(pz)));
+  const sx = dx > 0 ? 1 : -1, sy = dy > 0 ? 1 : -1, sz = dz > 0 ? 1 : -1;
+  const tdx = dx !== 0 ? Math.abs(1 / dx) : Infinity;
+  const tdy = dy !== 0 ? Math.abs(1 / dy) : Infinity;
+  const tdz = dz !== 0 ? Math.abs(1 / dz) : Infinity;
+  let tx = dx > 0 ? t0 + (x + 1 - px) / dx : dx < 0 ? t0 + (x - px) / dx : Infinity;
+  let ty = dy > 0 ? t0 + (y + 1 - py) / dy : dy < 0 ? t0 + (y - py) / dy : Infinity;
+  let tz = dz > 0 ? t0 + (z + 1 - pz) / dz : dz < 0 ? t0 + (z - pz) / dz : Infinity;
+  let tEnter = t0;
+  for (let k = 0, lim = N * 3 + 3; k < lim; k++) {
+    const i = x + y * N + z * NN;
+    if (hp[i] > 0) { ddaT = tEnter; return i; }
+    if (tx < ty && tx < tz) { x += sx; if (x < 0 || x >= N) return -1; tEnter = tx; tx += tdx; }
+    else if (ty < tz)       { y += sy; if (y < 0 || y >= N) return -1; tEnter = ty; ty += tdy; }
+    else                    { z += sz; if (z < 0 || z >= N) return -1; tEnter = tz; tz += tdz; }
+  }
+  return -1;
+}
+// Distance du centre à la première surface pleine dans la direction de la caméra
+function surfaceDistance() {
+  const len = camera.position.length();
+  if (len < 1e-6) return 0;
+  const ux = camera.position.x / len, uy = camera.position.y / len, uz = camera.position.z / len;
+  const R = N, G = N / 2;
+  const i = dda(ux * R + G, uy * R + G, uz * R + G, -ux, -uy, -uz);
+  return i < 0 ? 0 : R - ddaT;
+}
+
+/* =====================================================================
+   8. CAMÉRA : impossible d'entrer dans la matière + sensibilité adaptée
+   ===================================================================== */
+function clampCamera() {
+  if (treasureView) { controls.rotateSpeed = (isMobile ? 0.55 : 0.8) * settings.rot; return false; }
+  const surf = surfaceDistance(), len = camera.position.length();
+  let changed = false;
+  if (len < surf + MIN_GAP) { camera.position.setLength(surf + MIN_GAP); changed = true; }
+  // plus on est près de la surface, plus la rotation est douce
+  const gap = Math.max(0, camera.position.length() - surf);
+  const k = Math.min(1, Math.max(0.05, gap / (N * 0.45)));
+  controls.rotateSpeed = (isMobile ? 0.55 : 0.8) * settings.rot * k;
+  return changed;
+}
+function zoomBy(factor) {
+  const surf = treasureView ? 0 : surfaceDistance();
+  const minGap = treasureView ? coreSize * 0.6 : MIN_GAP;
+  const maxD = treasureView ? coreSize * 6 : N * 4;
+  let gap = camera.position.length() - surf;
+  gap = Math.max(minGap, Math.min(maxD - surf, gap * factor));
+  camera.position.setLength(surf + gap);
+  requestRender();
+}
+
+/* =====================================================================
+   9. ENTRÉES
+   ===================================================================== */
+const ptrs = new Map();
+let down = null, multi = false, pinchD = 0;
+let hoverX = 0, hoverY = 0, hoverPending = false, hoverIdx = -1;
+const pinchDist = () => { const [a, b] = [...ptrs.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+
+canvas.addEventListener('pointerdown', e => {
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (ptrs.size === 1) { down = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId }; multi = false; }
+  else { multi = true; if (ptrs.size === 2) pinchD = pinchDist(); }
+  hideHelp(); unlockAudio();
+});
+canvas.addEventListener('pointermove', e => {
+  if (ptrs.has(e.pointerId)) {
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (ptrs.size === 2) {
+      const d = pinchDist();
+      if (pinchD > 0 && d > 0) zoomBy(Math.pow(pinchD / d, 1.2 * settings.zoom));
+      pinchD = d;
+    }
+  }
+  if (e.pointerType === 'mouse') { hoverX = e.clientX; hoverY = e.clientY; hoverPending = true; }
+});
+function endPointer(e) {
+  ptrs.delete(e.pointerId);
+  if (ptrs.size < 2) pinchD = 0;
+  if (!down || multi || e.pointerId !== down.id || e.type === 'pointercancel') { if (!ptrs.size) down = null; return; }
+  const dx = e.clientX - down.x, dy = e.clientY - down.y;
+  if (dx * dx + dy * dy < 64 && performance.now() - down.t < 450) {
+    const i = pickBlock(e.clientX, e.clientY);
+    if (i >= 0) { if (armed) useArtifact(armed, i); else playerHit(i); }
+  }
+  down = null;
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('pointerleave', () => { hoverIdx = -1; blockMat?.uniforms.uHover.value.set(-99, -99, -99); requestRender(); });
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const dy = e.deltaMode === 1 ? e.deltaY * 30 : e.deltaY;
+  zoomBy(Math.exp(Math.max(-200, Math.min(200, dy)) * 0.0012 * settings.zoom));
+}, { passive: false });
+
+/* ---------- Son (synthétisé) ---------- */
+let actx = null, noiseBuf = null;
+function unlockAudio() {
+  if (actx || !settings.sound) return;
+  try {
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    noiseBuf = actx.createBuffer(1, actx.sampleRate * 0.6, actx.sampleRate);
+    const ch = noiseBuf.getChannelData(0);
+    for (let k = 0; k < ch.length; k++) ch[k] = Math.random() * 2 - 1;
+  } catch (e) {}
+}
+function sfx(type) {
+  if (!settings.sound) return;
+  unlockAudio();
+  if (!actx) return;
+  try {
+    const t = actx.currentTime, g = actx.createGain();
+    g.connect(actx.destination);
+    if (type === 'hit') {
+      const o = actx.createOscillator(); o.type = 'triangle';
+      o.frequency.setValueAtTime(220 + Math.random() * 40, t); o.frequency.exponentialRampToValueAtTime(70, t + 0.07);
+      g.gain.setValueAtTime(0.16, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+      o.connect(g); o.start(t); o.stop(t + 0.09);
+    } else if (type === 'treasure') {
+      [523, 659, 784, 1047].forEach((f, k) => {
+        const o = actx.createOscillator(), gg = actx.createGain(); o.type = 'sine'; o.frequency.value = f;
+        gg.gain.setValueAtTime(0, t + k * 0.09); gg.gain.linearRampToValueAtTime(0.15, t + k * 0.09 + 0.02);
+        gg.gain.exponentialRampToValueAtTime(0.001, t + k * 0.09 + 0.5);
+        o.connect(gg); gg.connect(actx.destination); o.start(t + k * 0.09); o.stop(t + k * 0.09 + 0.55);
+      });
+    } else {
+      const big = type === 'boom';
+      const s = actx.createBufferSource(), f = actx.createBiquadFilter();
+      s.buffer = noiseBuf; f.type = 'lowpass'; f.frequency.value = big ? 420 : 1100;
+      g.gain.setValueAtTime(big ? 0.6 : 0.33, t); g.gain.exponentialRampToValueAtTime(0.001, t + (big ? 0.55 : 0.18));
+      s.connect(f); f.connect(g); s.start(t);
+    }
+  } catch (e) {}
+}
+
+/* =====================================================================
+   10. INTERFACE
+   ===================================================================== */
+function toast(text, big = false) {
+  const el = document.createElement('div');
+  el.className = 'toast' + (big ? ' big' : '');
+  el.textContent = text;
+  const feed = $('feed');
+  feed.prepend(el);
+  while (feed.children.length > 4) feed.lastChild.remove();
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 700); }, big ? 6000 : 4000);
+}
+const pct = x => (x * 100).toFixed(x < 0.01 ? 3 : 2).replace('.', ',') + ' %';
+function updateHUD() {
+  const done = TOTAL - remaining;
+  $('count').textContent = `Blocs restants : ${fmt.format(remaining)} / ${fmt.format(TOTAL)}`;
+  $('barFill').style.width = (done / TOTAL * 100) + '%';
+  let sub = `${pct(done / TOTAL)} détruit · Toi : ${fmt.format(myStats.hits)} coups · ${fmt.format(myStats.blocks)} blocs`;
+  const hl = hammerUntil - performance.now();
+  if (hl > 0) sub += ` · 🔨 ${Math.ceil(hl / 1000)} s`;
+  $('sub').textContent = sub;
+  $('online').textContent = backend?.online ? `👥 En ligne : ${onlineNames.length ? onlineNames.join(', ') : '…'}` : '';
+  hudDirty = false;
+}
+let helpHidden = false;
+function hideHelp() { if (helpHidden) return; helpHidden = true; $('help').style.opacity = '0'; }
+setTimeout(hideHelp, 8000);
+
+function renderInvBar() {
+  const bar = $('invBar'); bar.innerHTML = '';
+  for (const [k, A] of Object.entries(ARTIFACTS)) {
+    const q = inventory[k] || 0;
+    if (!q) continue;
+    const b = document.createElement('button');
+    b.innerHTML = `${A.icon}<b>${q}</b>`;
+    b.title = A.name;
+    if (armed === k) b.classList.add('on');
+    b.onclick = () => {
+      if (armed === k) return disarm();
+      if (A.target) arm(k); else useArtifact(k, null);
+    };
+    bar.appendChild(b);
+  }
+}
+
+function openModal(title, html) {
+  $('mTitle').textContent = title;
+  $('mBody').innerHTML = html;
+  $('modal').classList.add('open');
+}
+const closeModal = () => $('modal').classList.remove('open');
+$('mClose').onclick = closeModal;
+$('modal').addEventListener('click', e => { if (e.target === $('modal')) closeModal(); });
+$('bDisarm').onclick = disarm;
+
+/* ---------- Classement ---------- */
+const fmtMs = ms => (ms / 1000).toFixed(1).replace('.', ',') + ' s';
+async function openBoard() {
+  openModal('🏆 Classement', '<p class="muted">Chargement…</p>');
+  let rows;
+  try { rows = await backend.leaderboard(); } catch (e) { $('mBody').innerHTML = `<p>⚠️ ${esc(e.message)}</p>`; return; }
+  const best = (key, cmp, ok = r => r[key] > 0) => {
+    const c = rows.filter(ok);
+    return c.length ? c.reduce((a, b) => (cmp(b[key], a[key]) ? b : a)) : null;
+  };
+  const recs = [
+    ['🧱 Plus gros casseur', best('blocks', (a, b) => a > b), r => `${r.pseudo} · ${fmt.format(r.blocks)} blocs`],
+    ['👊 Plus de coups', best('hits', (a, b) => a > b), r => `${r.pseudo} · ${fmt.format(r.hits)} coups`],
+    ['⏱️ Bloc détruit le plus vite', best('best_break_ms', (a, b) => a < b, r => r.best_break_ms != null), r => `${r.pseudo} · ${fmtMs(r.best_break_ms)}`],
+    ['⚡ Frappe la plus rapide', best('best_cps', (a, b) => a > b), r => `${r.pseudo} · ${r.best_cps} coups / 10 s`],
+    ['⛏️ Le plus profond', best('deepest', (a, b) => a > b, r => r.blocks > 0), r => `${r.pseudo} · couche ${r.deepest + 1}`],
+    ['🎁 Chasseur d’artefacts', best('artifacts_found', (a, b) => a > b), r => `${r.pseudo} · ${r.artifacts_found}`],
+    ['💥 Artificier', best('artifacts_used', (a, b) => a > b), r => `${r.pseudo} · ${r.artifacts_used} utilisés`],
+  ];
+  const medals = ['🥇', '🥈', '🥉'];
+  const done = TOTAL - remaining;
+  $('mBody').innerHTML = `
+    <p class="muted">Cube ${N}×${N}×${N} · ${pct(done / TOTAL)} détruit · ${fmt.format(done)} blocs sur ${fmt.format(TOTAL)}</p>
+    <div class="records">${recs.map(([t, r, f]) => `<div class="rec">${t}<b>${r ? esc(f(r)) : '—'}</b></div>`).join('')}</div>
+    <div class="sec"><h3>Joueurs</h3>
+    ${rows.map((r, k) => `<div class="pl">
+      <div><span class="nm">${medals[k] || (k + 1) + '.'} ${esc(r.pseudo)}</span>${onlineNames.includes(r.pseudo) ? '<span class="dot" title="en ligne"></span>' : ''}</div>
+      <div class="muted" style="opacity:.8">🧱 ${fmt.format(r.blocks)} blocs · 👊 ${fmt.format(r.hits)} coups · ⚡ ${r.best_cps}/10 s
+      · ⏱️ ${r.best_break_ms != null ? fmtMs(r.best_break_ms) : '—'} · ⛏️ couche ${r.deepest + 1} · 🎁 ${r.artifacts_found} trouvés / ${r.artifacts_used} utilisés</div>
+    </div>`).join('')}</div>`;
+}
+
+/* ---------- Inventaire ---------- */
+async function openInventory() {
+  let players = [];
+  if (backend.online) { try { players = (await backend.leaderboard()).filter(r => r.id !== me.id); } catch (e) {} }
+  const opts = players.map(p => `<option value="${esc(p.id)}">${esc(p.pseudo)}</option>`).join('');
+  openModal('🎒 Mes artefacts', `
+    <p class="muted">Les artefacts sont cachés dans le cube, aux mêmes endroits pour tout le monde
+    (environ 1 bloc sur 17 000). Celui qui casse le bloc le gagne.</p>
+    ${Object.entries(ARTIFACTS).map(([k, A]) => {
+      const q = inventory[k] || 0;
+      return `<div class="item" style="${q ? '' : 'opacity:.45'}">
+        <div class="ic">${A.icon}</div>
+        <div class="tx"><b>${A.name} × ${q}</b><span class="muted">${A.desc}</span>
+          ${q ? `<div class="btns"><button class="primary" data-use="${k}">Utiliser</button>
+            ${backend.online && players.length ? `<select data-to="${k}" style="width:auto;flex:1">${opts}</select><button data-give="${k}">🎁 Donner</button>` : ''}</div>` : ''}
+        </div></div>`;
+    }).join('')}`);
+  $('mBody').querySelectorAll('[data-use]').forEach(b => b.onclick = () => {
+    const k = b.dataset.use; closeModal();
+    if (ARTIFACTS[k].target) arm(k); else useArtifact(k, null);
+  });
+  $('mBody').querySelectorAll('[data-give]').forEach(b => b.onclick = async () => {
+    const k = b.dataset.give, sel = $('mBody').querySelector(`[data-to="${k}"]`);
+    const to = sel.value, name = sel.options[sel.selectedIndex].text, A = ARTIFACTS[k];
+    try {
+      await backend.give(to, k);
+      inventory[k]--; renderInvBar();
+      backend.send('give', { to, from: me.pseudo, kind: k });
+      backend.send('feed', { text: `🎁 ${me.pseudo} a donné ${A.icon} ${A.name} à ${name}` });
+      toast(`🎁 ${A.icon} ${A.name} donné à ${name}`, true);
+      openInventory();
+    } catch (e) { toast('⚠️ ' + e.message); }
+  });
+}
+
+/* ---------- Réglages ---------- */
+function openSettings() {
+  const sizes = [10, 30, 50, 80, 100, 128];
+  openModal('⚙️ Réglages', `
+    <label>Sensibilité de rotation</label><input type="range" id="sRot" min="0.3" max="2" step="0.05" value="${settings.rot}">
+    <label>Sensibilité du zoom (molette et pincement)</label><input type="range" id="sZoom" min="0.3" max="2" step="0.05" value="${settings.zoom}">
+    <div class="btns"><button id="sSound">${settings.sound ? '🔊 Son activé' : '🔇 Son coupé'}</button>
+      <button id="sFps">${settings.fps ? '📈 Masquer les performances' : '📈 Afficher les performances'}</button></div>
+    ${backend.online ? `<div class="sec"><p class="muted">Connecté en tant que <b>${esc(me.pseudo)}</b></p><button id="sOut">Se déconnecter</button></div>`
+      : `<div class="sec"><h3>Mode solo — taille du cube</h3><div class="seg">${sizes.map(s =>
+          `<button data-size="${s}" class="${s === N ? 'on' : ''}">${s}³</button>`).join('')}</div>
+          <p class="muted">Chaque taille garde sa propre progression.</p></div>`}`);
+  $('sRot').oninput = e => { settings.rot = +e.target.value; saveSettings(); };
+  $('sZoom').oninput = e => { settings.zoom = +e.target.value; saveSettings(); };
+  $('sSound').onclick = () => { settings.sound = !settings.sound; saveSettings(); openSettings(); };
+  $('sFps').onclick = () => { settings.fps = !settings.fps; saveSettings(); $('fps').classList.toggle('hidden', !settings.fps); openSettings(); };
+  if ($('sOut')) $('sOut').onclick = () => backend.logout();
+  $('mBody').querySelectorAll('[data-size]').forEach(b => b.onclick = async () => {
+    backend.persistNow?.();
+    try { localStorage.setItem('le-cube-size', b.dataset.size); } catch (e) {}
+    location.reload();
+  });
+}
+
+/* ---------- Administration ---------- */
+async function openAdmin() {
+  openModal('👑 Administration', '<p class="muted">Chargement…</p>');
+  let cfg = { kind: 'noeud', message: '', image: '' }, players = [];
+  try { cfg = (await backend.getTreasure()) || cfg; } catch (e) {}
+  if (backend.online) { try { players = await backend.players(); } catch (e) { toast('⚠️ ' + e.message); } }
+  const pend = players.filter(p => p.status === 'pending');
+  const others = players.filter(p => p.status !== 'pending' && !p.is_admin);
+  const locked = treasureRevealed;
+  const row = (p, btns) => `<div class="item"><div class="tx"><b>${esc(p.pseudo)}</b><span class="muted">${esc(p.email || '')}</span></div>${btns}</div>`;
+  $('mBody').innerHTML = `
+    ${backend.online ? `<h3 style="margin:0 0 6px">Inscriptions en attente (${pend.length})</h3>
+      ${pend.length ? pend.map(p => row(p, `<button class="primary" data-ok="${p.id}">✓ Valider</button><button class="danger" data-no="${p.id}">✕</button>`)).join('')
+        : '<p class="muted">Personne en attente.</p>'}
+      <div class="sec"><h3>Joueurs</h3>${others.length ? others.map(p => row(p, p.status === 'approved'
+        ? `<button class="danger" data-no="${p.id}">Retirer l’accès</button>` : `<span class="muted">refusé</span><button data-ok="${p.id}">Valider</button>`)).join('')
+        : '<p class="muted">Aucun joueur pour l’instant.</p>'}</div>` : ''}
+    <div class="${backend.online ? 'sec' : ''}"><h3>🎁 Ce qui apparaîtra au centre</h3>
+      ${locked ? '<p class="muted">Le trésor a été révélé : il ne peut plus être modifié.</p>' : '<p class="muted">Modifiable à tout moment tant que le cœur du cube n’est pas atteint. Secret pour les joueurs.</p>'}
+      <label>Objet</label><select id="tKind" ${locked ? 'disabled' : ''}>${Object.entries(TREASURES).map(([k, v]) => `<option value="${k}" ${cfg.kind === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+      <label>Message gravé sur une plaque dorée (facultatif)</label><textarea id="tMsg" rows="2" maxlength="200" ${locked ? 'disabled' : ''}>${esc(cfg.message)}</textarea>
+      <label>Photo (facultatif)</label>
+      <div class="btns" style="margin-top:0;align-items:center"><span id="tImgName" class="muted">${cfg.image ? '✓ une photo est choisie' : 'aucune photo'}</span>
+        ${locked ? '' : `<button id="tImgPick">📷 Choisir…</button><button id="tImgDel" class="${cfg.image ? '' : 'hidden'}">Retirer</button>`}</div>
+      <input type="file" id="tImg" accept="image/*" class="hidden">
+      <div class="btns"><button id="tSave" class="primary" ${locked ? 'disabled' : ''}>Enregistrer</button><button id="tPrev">👁 Aperçu</button></div>
+    </div>
+    <div class="sec" id="admArt"><h3>🎒 Artefacts</h3><p class="muted">Chargement…</p></div>
+    <div class="sec"><h3>🧊 Nouveau cube</h3>
+      <p class="muted">Efface toute la progression, les artefacts et les statistiques. Les comptes et le trésor sont conservés.</p>
+      <div class="btns" style="align-items:center"><select id="nSize" style="width:auto">${[30, 50, 80, 100, 128].map(s => `<option value="${s}" ${s === N ? 'selected' : ''}>${s}³ — ${fmt.format(s ** 3)} blocs</option>`).join('')}</select>
+      <button id="nGo" class="danger">Recommencer</button></div>
+    </div>`;
+  const cur = { ...cfg };
+  $('mBody').querySelectorAll('[data-ok]').forEach(b => b.onclick = async () => { try { await backend.setStatus(b.dataset.ok, 'approved'); toast('✓ Joueur validé'); openAdmin(); } catch (e) { toast('⚠️ ' + e.message); } });
+  $('mBody').querySelectorAll('[data-no]').forEach(b => b.onclick = async () => { try { await backend.setStatus(b.dataset.no, 'refused'); openAdmin(); } catch (e) { toast('⚠️ ' + e.message); } });
+  const readForm = () => ({ kind: $('tKind').value, message: $('tMsg').value.trim(), image: cur.image || '' });
+  if ($('tImgPick')) {
+    $('tImgPick').onclick = () => $('tImg').click();
+    $('tImg').onchange = async e => {
+      const file = e.target.files[0]; if (!file) return;
+      $('tImgName').textContent = 'envoi en cours…';
+      try { cur.image = await backend.uploadImage(file); $('tImgName').textContent = '✓ photo prête (pense à enregistrer)'; $('tImgDel').classList.remove('hidden'); }
+      catch (err) { $('tImgName').textContent = '⚠️ ' + err.message; }
+    };
+    $('tImgDel').onclick = () => { cur.image = ''; $('tImgName').textContent = 'aucune photo (pense à enregistrer)'; $('tImgDel').classList.add('hidden'); };
+  }
+  $('tSave').onclick = async () => { try { await backend.setTreasure(readForm()); toast('✓ Trésor enregistré', true); } catch (e) { toast('⚠️ ' + e.message); } };
+  $('tPrev').onclick = async () => {
+    const c = locked ? cfg : readForm();
+    closeModal();
+    previewMode = !treasureRevealed;
+    await showTreasure(c);
+    setTreasureView(true);
+    toast('👁 Aperçu du trésor. Bouton « 🧊 Cube » pour revenir.', true);
+  };
+  renderAdminArtifacts(backend.online ? players.filter(p => p.status === 'approved') : [{ id: me.id, pseudo: me.pseudo }]);
+  $('nGo').onclick = async () => {
+    const s = +$('nSize').value;
+    if (!confirm(`Effacer toute la partie et recommencer avec un cube ${s}³ ?`)) return;
+    if (!confirm('Vraiment sûr ? Ce n’est pas annulable.')) return;
+    try { await backend.newCube(s); backend.send('reset', {}); location.reload(); } catch (e) { toast('⚠️ ' + e.message); }
+  };
+}
+
+/* ---------- Administration des artefacts ---------- */
+async function renderAdminArtifacts(players) {
+  const box = $('admArt');
+  if (!box) return;
+  let data;
+  try { data = await backend.adminArtifacts(); }
+  catch (e) { box.innerHTML = `<h3>🎒 Artefacts</h3><p>⚠️ ${esc(e.message)}</p>`; return; }
+  const kinds = Object.entries(ARTIFACTS);
+  const kOpts = kinds.map(([k, A]) => `<option value="${k}">${A.icon} ${A.name}</option>`).join('');
+  const maxL = Math.ceil(N / 2);
+  const owned = {};
+  for (const r of data.inventories || []) (owned[r.pseudo] ||= []).push(`${ARTIFACTS[r.kind]?.icon || r.kind} × ${r.qty}`);
+  let hiddenTotal = 0;
+  const rows = kinds.map(([k, A]) => {
+    const c = (data.kinds || {})[k] || { hidden: 0, found: 0 };
+    hiddenTotal += +c.hidden;
+    return `<div class="item" style="padding:5px 0"><div class="ic" style="font-size:20px">${A.icon}</div>
+      <div class="tx">${A.name}</div><div class="muted" style="opacity:.9"><b>${c.hidden}</b> cachés · ${c.found} trouvés</div></div>`;
+  }).join('');
+  box.innerHTML = `<h3>🎒 Artefacts</h3>
+    <p class="muted">${hiddenTotal} cachés en tout, soit environ 1 bloc sur ${fmt.format(Math.round(remaining / Math.max(1, hiddenTotal)))}.
+    Leur position reste secrète, même pour toi.</p>
+    ${rows}
+    <label>Cacher ou retirer des artefacts dans le cube</label>
+    <div class="btns" style="margin-top:0"><select id="aK" style="flex:2">${kOpts}</select>
+      <input id="aQ" type="number" min="1" max="500" value="1" style="flex:1" aria-label="Quantité"></div>
+    <div class="btns" style="align-items:center"><span class="muted">Entre les couches</span>
+      <input id="aMin" type="number" min="1" max="${maxL}" value="1" style="width:72px"><span class="muted">et</span>
+      <input id="aMax" type="number" min="1" max="${maxL}" value="${maxL}" style="width:72px"></div>
+    <p class="muted" style="margin:4px 0 0">Couche 1 = la surface, couche ${maxL} = le centre. Les artefacts ne vont que dans des blocs encore intacts.</p>
+    <div class="btns"><button class="primary" id="aAdd">➕ Cacher</button><button id="aDel">➖ Retirer</button>
+      <button class="danger" id="aDelAll">Retirer tous ceux de ce type</button></div>
+    <label>Qui possède quoi</label>
+    ${Object.keys(owned).length ? Object.entries(owned).map(([p, l]) => `<div style="font-size:13px;padding:2px 0"><b>${esc(p)}</b> : ${l.join(' · ')}</div>`).join('')
+      : '<p class="muted" style="margin:0">Personne n’a d’artefact pour l’instant.</p>'}
+    <label>Donner ou reprendre directement</label>
+    <div class="btns" style="margin-top:0"><select id="gP" style="flex:2">${players.map(p => `<option value="${esc(p.id)}">${esc(p.pseudo)}</option>`).join('')}</select>
+      <select id="gK" style="flex:2">${kOpts}</select><input id="gQ" type="number" min="1" max="99" value="1" style="flex:1" aria-label="Quantité"></div>
+    <div class="btns"><button class="primary" id="gAdd">🎁 Donner</button><button id="gDel">↩️ Reprendre</button></div>`;
+  const run = async (fn, okMsg) => {
+    try { const r = await fn(); toast(okMsg(r), true); renderAdminArtifacts(players); }
+    catch (e) { toast('⚠️ ' + e.message); }
+  };
+  const qty = id => Math.max(1, Math.min(500, Math.floor(+$(id).value) || 1));
+  const label = id => { const A = ARTIFACTS[$(id).value]; return `${A.icon} ${A.name}`; };
+  $('aAdd').onclick = () => {
+    const mn = Math.max(1, Math.min(maxL, +$('aMin').value || 1)), mx = Math.max(1, Math.min(maxL, +$('aMax').value || maxL));
+    run(() => backend.addArtifacts($('aK').value, qty('aQ'), Math.min(mn, mx) - 1, Math.max(mn, mx) - 1),
+      n => `${n} × ${label('aK')} caché${n > 1 ? 's' : ''} dans le cube`);
+  };
+  $('aDel').onclick = () => run(() => backend.removeArtifacts($('aK').value, qty('aQ')), n => `${n} × ${label('aK')} retiré${n > 1 ? 's' : ''}`);
+  $('aDelAll').onclick = () => {
+    if (confirm(`Retirer du cube tous les « ${label('aK')} » encore cachés ?`))
+      run(() => backend.removeArtifacts($('aK').value, null), n => `${n} × ${label('aK')} retiré${n > 1 ? 's' : ''}`);
+  };
+  const give = sign => {
+    if (!$('gP').value) return;
+    const to = $('gP').value, k = $('gK').value, d = sign * qty('gQ');
+    run(async () => {
+      await backend.setInventory(to, k, d);
+      if (to === me.id) { inventory = await backend.inventory(); renderInvBar(); }
+      else backend.send('inv', { to, kind: k, delta: d });
+    }, () => sign > 0 ? `🎁 ${Math.abs(d)} × ${label('gK')} donné` : `↩️ ${Math.abs(d)} × ${label('gK')} repris`);
+  };
+  $('gAdd').onclick = () => give(1);
+  $('gDel').onclick = () => give(-1);
+}
+
+$('bBoard').onclick = openBoard;
+$('bInv').onclick = openInventory;
+$('bSettings').onclick = openSettings;
+$('bAdmin').onclick = openAdmin;
+$('bTreasure').onclick = () => setTreasureView(!treasureView);
+$('bView').onclick = () => { $('banner').classList.remove('open'); setTreasureView(true); };
+$('bBannerClose').onclick = () => $('banner').classList.remove('open');
+$('fps').classList.toggle('hidden', !settings.fps);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  requestRender();
+});
+
+/* =====================================================================
+   11. OUTILS IMAGES
+   ===================================================================== */
+async function downscaleImage(file, max = 900) {
+  const bmp = await createImageBitmap(file);
+  const s = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(bmp.width * s); cv.height = Math.round(bmp.height * s);
+  cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+  return new Promise(res => cv.toBlob(res, 'image/jpeg', 0.85));
+}
+const blobToDataURL = b => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(b); });
+
+/* =====================================================================
+   12. MODE SOLO (aucun serveur : simule exactement le serveur, sauvegarde locale)
+   ===================================================================== */
+function createLocalBackend() {
+  let size = 128;
+  try { const s = parseInt(localStorage.getItem('le-cube-size'), 10); if (s >= 10 && s <= 128) size = s; } catch (e) {}
+  const KEY = 'le-cube-solo-v2-' + size;
+  let shp, seed, st, inv, found, treasure;
+  const arts = new Map();
+  const rng = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const rle = a => { const o = []; let v = a[0], c = 1; for (let i = 1; i < a.length; i++) { if (a[i] === v) c++; else { o.push(v + 'x' + c); v = a[i]; c = 1; } } o.push(v + 'x' + c); return o.join(','); };
+  const unrle = (s, a) => { let p = 0; for (const part of s.split(',')) { const [v, c] = part.split('x').map(Number); if (!(c > 0) || p + c > a.length || v > MAX_HP) return false; a.fill(v, p, p + c); p += c; } return p === a.length; };
+  function genArts() {
+    arts.clear();
+    const r = rng(seed), T = size ** 3;
+    for (const [k, c] of Object.entries(ART_COUNTS)) {
+      const n = Math.max(1, Math.round(c * T / 2097152));
+      for (let j = 0; j < n; j++) { const i = Math.floor(r() * T); if (!arts.has(i)) arts.set(i, k); }
+    }
+  }
+  function persist() { try { localStorage.setItem(KEY, JSON.stringify({ seed, hp: rle(shp), st, inv, found: [...found], treasure, arts: [...arts] })); } catch (e) {} }
+  const layerOf = i => Math.min(i % size, size - 1 - i % size, ((i / size) | 0) % size, size - 1 - ((i / size) | 0) % size, (i / (size * size)) | 0, size - 1 - ((i / (size * size)) | 0));
+  let pt = null;
+  const schedulePersist = () => { if (!pt) pt = setTimeout(() => { pt = null; persist(); }, 1500); };
+  addEventListener('pagehide', () => shp && persist());
+  function destroy(i) {
+    if (shp[i] === 0) return null;
+    shp[i] = 0; st.blocks++;
+    let a = '';
+    if (arts.has(i) && !found.has(i)) { found.add(i); a = arts.get(i); inv[a] = (inv[a] || 0) + 1; st.artifacts_found++; }
+    return a;
+  }
+  return {
+    online: false,
+    async start() { me = { id: 'moi', pseudo: 'Moi', isAdmin: true }; return { size }; },
+    async loadBlocks() {
+      shp = new Uint8Array(size ** 3).fill(MAX_HP);
+      st = { hits: 0, blocks: 0, artifacts_found: 0, artifacts_used: 0, best_break_ms: null, best_cps: 0, deepest: 0 };
+      inv = {}; found = new Set(); treasure = { kind: 'noeud', message: '', image: '' };
+      seed = (Math.random() * 2 ** 31) | 0;
+      try {
+        const d = JSON.parse(localStorage.getItem(KEY) || 'null');
+        if (d && unrle(d.hp, shp)) {
+          seed = d.seed; Object.assign(st, d.st); inv = d.inv || {}; found = new Set(d.found || []); treasure = d.treasure || treasure;
+          if (Array.isArray(d.arts)) for (const [i, k] of d.arts) arts.set(i, k);
+        } else shp.fill(MAX_HP);
+      } catch (e) { shp.fill(MAX_HP); }
+      if (!arts.size) genArts();
+      hp.set(shp);
+    },
+    async hit(list, ex) {
+      const out = [];
+      for (const [i, n0] of list) {
+        const n = Math.min(Math.max(n0, 1), 10);
+        if (shp[i] === 0) { out.push([i, 0, '']); continue; }
+        st.hits += n;
+        const v = Math.max(0, shp[i] - n);
+        let a = '';
+        if (v === 0) a = destroy(i); else shp[i] = v;
+        out.push([i, v, a]);
+      }
+      if (ex.best_ms != null) st.best_break_ms = st.best_break_ms == null ? ex.best_ms : Math.min(st.best_break_ms, ex.best_ms);
+      st.best_cps = Math.max(st.best_cps, ex.cps || 0);
+      st.deepest = Math.max(st.deepest, ex.deep || 0);
+      schedulePersist();
+      return out;
+    },
+    async use(k, center, dir) {
+      if (!(inv[k] > 0)) throw new Error('Tu n’as plus cet artefact');
+      inv[k]--; st.artifacts_used++;
+      const s = size, cx = center % s, cy = ((center / s) | 0) % s, cz = (center / (s * s)) | 0;
+      const res = { destroyed: [], found: [], radar: -1 };
+      const take = i => { const a = destroy(i); if (a !== null) { res.destroyed.push(i); if (a) res.found.push({ i, kind: a }); } };
+      if (k === 'bombe' || k === 'megabombe') {
+        const r = k === 'bombe' ? 1 : 3;
+        for (let z = Math.max(0, cz - r); z <= Math.min(s - 1, cz + r); z++)
+          for (let y = Math.max(0, cy - r); y <= Math.min(s - 1, cy + r); y++)
+            for (let x = Math.max(0, cx - r); x <= Math.min(s - 1, cx + r); x++) take(x + y * s + z * s * s);
+      } else if (k === 'foreuse') {
+        const d = DIRS[dir] || DIRS[0];
+        for (let t = 0; t < 15; t++) {
+          const x = cx + d[0] * t, y = cy + d[1] * t, z = cz + d[2] * t;
+          if (x < 0 || y < 0 || z < 0 || x >= s || y >= s || z >= s) break;
+          take(x + y * s + z * s * s);
+        }
+      } else if (k === 'radar') {
+        let bd = Infinity;
+        for (const i of arts.keys()) {
+          if (found.has(i)) continue;
+          const d = Math.abs(i % s - cx) + Math.abs(((i / s) | 0) % s - cy) + Math.abs(((i / (s * s)) | 0) - cz);
+          if (d < bd) { bd = d; res.radar = i; }
+        }
+      }
+      schedulePersist();
+      return res;
+    },
+    async give() { throw new Error('Les échanges ne marchent qu’en ligne'); },
+    async inventory() { return { ...inv }; },
+    async leaderboard() { return [{ id: 'moi', pseudo: 'Moi', ...st }]; },
+    async getTreasure() { return { ...treasure }; },
+    async setTreasure(c) { treasure = { kind: c.kind, message: c.message, image: c.image }; persist(); },
+    async uploadImage(file) { return blobToDataURL(await downscaleImage(file, 700)); },
+    async imageUrl(p) { return p; },
+    async newCube(s) { try { localStorage.removeItem('le-cube-solo-v2-' + s); localStorage.setItem('le-cube-size', String(s)); } catch (e) {} },
+    async adminArtifacts() {
+      const kinds = {};
+      for (const [i, k] of arts) { const c = kinds[k] ||= { hidden: 0, found: 0 }; found.has(i) ? c.found++ : c.hidden++; }
+      return { kinds, inventories: Object.entries(inv).filter(([, q]) => q > 0).map(([kind, qty]) => ({ id: 'moi', pseudo: 'Moi', kind, qty })) };
+    },
+    async addArtifacts(k, cnt, mn, mx) {
+      const lo = Math.max(0, mn), hi = size - 1 - lo, maxL = Math.min(mx, Math.floor((size - 1) / 2));
+      if (lo > maxL) throw new Error('Couches invalides');
+      let added = 0;
+      for (let t = 0; t < cnt * 200 && added < cnt; t++) {
+        const r = () => lo + Math.floor(Math.random() * (hi - lo + 1));
+        const i = r() + r() * size + r() * size * size;
+        if (shp[i] === 0 || arts.has(i) || layerOf(i) > maxL) continue;
+        arts.set(i, k); added++;
+      }
+      persist(); return added;
+    },
+    async removeArtifacts(k, cnt) {
+      const list = [...arts].filter(([i, kk]) => kk === k && !found.has(i)).sort(() => Math.random() - 0.5);
+      const take = cnt == null ? list : list.slice(0, cnt);
+      for (const [i] of take) arts.delete(i);
+      persist(); return take.length;
+    },
+    async setInventory(p, k, delta) { inv[k] = Math.max(0, (inv[k] || 0) + delta); persist(); return inv[k]; },
+    async resync() { return null; },
+    send() {}, onMessage() {}, onPresence() {}, logout() {},
+    persistNow: () => shp && persist(),
+  };
+}
+
+/* =====================================================================
+   13. MODE EN LIGNE (Supabase)
+   ===================================================================== */
+async function createOnlineBackend() {
+  const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+  const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+  let ch = null, handler = () => {}, presenceCb = () => {};
+  const rpc = async (fn, args) => {
+    const { data, error } = await sb.rpc(fn, args);
+    if (error) throw new Error(error.message);
+    return data;
+  };
+  const parseBlocks = txt => {
+    const out = [];
+    if (txt) for (const part of txt.split(',')) { const c = part.indexOf(':'); out.push([+part.slice(0, c), +part.slice(c + 1)]); }
+    return out;
+  };
+  return {
+    online: true,
+    async start() {
+      const prof = await authFlow(sb);
+      me = { id: prof.id, pseudo: prof.pseudo, isAdmin: prof.is_admin };
+      $('loading').style.display = 'flex';
+      const g = await rpc('game_state');
+      if (!g) throw new Error('Accès non autorisé');
+      const { data: { session } } = await sb.auth.getSession();
+      await sb.realtime.setAuth(session.access_token);
+      sb.auth.onAuthStateChange((_e, s) => { if (s?.access_token) sb.realtime.setAuth(s.access_token); });
+      ch = sb.channel('le-cube', { config: { private: true, broadcast: { self: false }, presence: { key: me.id } } });
+      ch.on('broadcast', { event: 'msg' }, ({ payload }) => handler(payload));
+      ch.on('presence', { event: 'sync' }, () => {
+        const st = ch.presenceState();
+        presenceCb(Object.values(st).map(a => a[0]?.pseudo).filter(Boolean));
+      });
+      ch.subscribe(async status => {
+        if (status === 'SUBSCRIBED') await ch.track({ pseudo: me.pseudo });
+        else if (status === 'CHANNEL_ERROR') toast('⚠️ Temps réel indisponible (les coups des autres arriveront au prochain rechargement)');
+      });
+      return { size: g.size };
+    },
+    async loadBlocks() { for (const [i, v] of parseBlocks(await rpc('get_blocks'))) if (i >= 0 && i < TOTAL) hp[i] = v; },
+    async resync() { return parseBlocks(await rpc('get_blocks')); },
+    hit: (list, ex) => rpc('hit_blocks', { idx: list.map(e => e[0]), n: list.map(e => e[1]), best_ms: ex.best_ms, cps: ex.cps, deep: ex.deep }),
+    use: (k, center, dir) => rpc('use_artifact', { k, center, dir }),
+    give: (to, k) => rpc('give_artifact', { to_player: to, k }),
+    inventory: async () => (await rpc('get_inventory')) || {},
+    leaderboard: async () => (await rpc('get_leaderboard')) || [],
+    players: async () => (await rpc('admin_players')) || [],
+    setStatus: (p, s) => rpc('admin_set_status', { p, s }),
+    getTreasure: () => rpc('get_treasure'),
+    setTreasure: c => rpc('set_treasure', { k: c.kind, msg: c.message, img: c.image }),
+    async uploadImage(file) {
+      const blob = await downscaleImage(file);
+      const path = 'photo-' + Date.now() + '.jpg';
+      const { data, error } = await sb.storage.from('tresor').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+      if (error) throw new Error(error.message);
+      return data.path;
+    },
+    async imageUrl(path) {
+      const { data, error } = await sb.storage.from('tresor').createSignedUrl(path, 3600);
+      if (error) throw new Error(error.message);
+      return data.signedUrl;
+    },
+    newCube: s => rpc('admin_new_cube', { new_size: s }),
+    adminArtifacts: () => rpc('admin_artifacts'),
+    addArtifacts: (k, cnt, mn, mx) => rpc('admin_add_artifacts', { k, cnt, min_layer: mn, max_layer: mx }),
+    removeArtifacts: (k, cnt) => rpc('admin_remove_artifacts', { k, cnt }),
+    setInventory: (p, k, delta) => rpc('admin_set_inventory', { p, k, delta }),
+    send(type, payload) { ch?.send({ type: 'broadcast', event: 'msg', payload: { type, ...payload } }); },
+    onMessage(fn) { handler = fn; },
+    onPresence(fn) { presenceCb = fn; },
+    async logout() { await sb.auth.signOut(); location.reload(); },
+  };
+}
+
+/* ---------- écran de connexion / inscription ---------- */
+function authFlow(sb) {
+  const box = $('auth');
+  $('loading').style.display = 'none';
+  box.classList.add('open');
+  let mode = 'login';
+  const view = v => { for (const id of ['vLogin', 'vPending', 'vRefused']) $(id).classList.toggle('hidden', id !== v); };
+  const msg = (t, ok) => { $('aMsg').textContent = t || ''; $('aMsg').style.color = ok ? '#9fe3a8' : '#ffb3b3'; };
+  const setMode = m => {
+    mode = m;
+    $('tLogin').classList.toggle('on', m === 'login'); $('tSignup').classList.toggle('on', m === 'signup');
+    $('fPseudo').classList.toggle('hidden', m !== 'signup');
+    $('aGo').textContent = m === 'login' ? 'Se connecter' : 'Créer mon compte';
+    $('aPass').autocomplete = m === 'login' ? 'current-password' : 'new-password';
+    msg('');
+  };
+  $('tLogin').onclick = () => setMode('login');
+  $('tSignup').onclick = () => setMode('signup');
+  return new Promise(resolve => {
+    async function check() {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) { view('vLogin'); return; }
+      const { data: p, error } = await sb.rpc('me');
+      if (error || !p) { msg(error ? error.message : 'Profil introuvable : le script SQL a-t-il été lancé ?'); view('vLogin'); return; }
+      if (p.status === 'approved') { box.classList.remove('open'); resolve(p); }
+      else view(p.status === 'refused' ? 'vRefused' : 'vPending');
+    }
+    $('aGo').onclick = async () => {
+      const email = $('aEmail').value.trim(), password = $('aPass').value;
+      if (!email || password.length < 6) return msg('E-mail et mot de passe (6 caractères min.) requis');
+      $('aGo').disabled = true; msg('');
+      try {
+        if (mode === 'login') {
+          const { error } = await sb.auth.signInWithPassword({ email, password });
+          if (error) throw error;
+          await check();
+        } else {
+          const pseudo = $('aPseudo').value.trim();
+          if (!pseudo) throw new Error('Choisis un pseudo');
+          const { data, error } = await sb.auth.signUp({ email, password, options: { data: { pseudo } } });
+          if (error) throw error;
+          if (data.session) await check();
+          else { setMode('login'); msg('Compte créé ! Vérifie ta boîte mail pour confirmer, puis connecte-toi.', true); }
+        }
+      } catch (e) {
+        msg(/invalid login/i.test(e.message) ? 'E-mail ou mot de passe incorrect' : e.message);
+      }
+      $('aGo').disabled = false;
+    };
+    $('aRefresh').onclick = check;
+    $('aLogout').onclick = $('aLogout2').onclick = async () => { await sb.auth.signOut(); view('vLogin'); msg(''); };
+    check();
+  });
+}
+
+/* =====================================================================
+   14. MESSAGES DES AUTRES JOUEURS
+   ===================================================================== */
+function onNetMessage(m) {
+  if (!ready) return;
+  if (m.type === 'hits' && Array.isArray(m.r)) {
+    for (let k = 0; k + 1 < m.r.length; k += 2) { const i = m.r[k]; if (i >= 0 && i < TOTAL) setHp(i, m.r[k + 1], 'net'); }
+  } else if (m.type === 'feed') toast(m.text);
+  else if (m.type === 'give' && m.to === me.id) {
+    backend.inventory().then(inv => { inventory = inv; renderInvBar(); });
+    const A = ARTIFACTS[m.kind];
+    if (A) toast(`🎁 ${m.from} t’a donné ${A.icon} ${A.name} !`, true);
+  } else if (m.type === 'inv' && m.to === me.id) {
+    backend.inventory().then(inv => { inventory = inv; if (armed && !(inventory[armed] > 0)) disarm(); renderInvBar(); });
+    const A = ARTIFACTS[m.kind];
+    if (A && m.delta > 0) toast(`🎁 L’organisateur t’a offert ${A.icon} ${A.name} !`, true);
+  } else if (m.type === 'reset') {
+    toast('🧊 Un nouveau cube commence…', true);
+    setTimeout(() => location.reload(), 2000);
+  }
+}
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', async () => {
+  if (document.hidden) { hiddenAt = Date.now(); if (pending.size) flushHits(); backend?.persistNow?.(); return; }
+  if (!ready || !backend.online || Date.now() - hiddenAt < 20000) return;
+  try { for (const [i, v] of await backend.resync()) if (i >= 0 && i < TOTAL) setHp(i, v, 'net'); } catch (e) {}
+});
+
+/* =====================================================================
+   15. BOUCLE DE RENDU (ne redessine que si quelque chose change)
+   ===================================================================== */
+let needsRender = true, flash = 0;
+function requestRender() { needsRender = true; }
+controls.addEventListener('change', requestRender);
+const clock = new THREE.Clock();
+let frames = 0, statT = 0;
+function loop() {
+  requestAnimationFrame(loop);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  controls.update();
+  if (clampCamera()) needsRender = true;
+  if (hoverPending) {
+    hoverPending = false;
+    const i = pickBlock(hoverX, hoverY);
+    if (i !== hoverIdx) {
+      hoverIdx = i;
+      if (i >= 0) blockMat.uniforms.uHover.value.set(i % N, ((i / N) | 0) % N, (i / NN) | 0);
+      else blockMat.uniforms.uHover.value.set(-99, -99, -99);
+      needsRender = true;
+    }
+  }
+  if (flash > 0) { flash = Math.max(0, flash - dt * 7); blockMat.uniforms.uFlash.value = flash; needsRender = true; }
+  if (pList.length || parts.count) { updateParticles(dt); needsRender = true; }
+  const now = performance.now();
+  if (beacon?.visible) {
+    if (now > beaconUntil) beacon.visible = false;
+    else beacon.scale.setScalar(1.5 + 2.5 * Math.abs(Math.sin(now / 300)));
+    needsRender = true;
+  }
+  if (treasureObj) {
+    const t = clock.elapsedTime;
+    if (treasureObj.spin) {
+      treasureObj.spin.rotation.y = t * 0.6;
+      if (treasureObj.spin.userData.orbs) treasureObj.spin.userData.orbs.rotation.y = -t * 1.4;
+    }
+    for (const o of treasureObj.sway) o.rotation.y = Math.sin(t * 0.7) * 0.35;
+    treasureObj.root.position.y = Math.sin(t * 1.4) * 0.05 * coreSize;
+    if (treasureView || treasureRevealed) needsRender = true;
+  }
+  if (hammerUntil > now) hudDirty = true;
+  if (hudDirty) updateHUD();
+  if (needsRender) {
+    cullFaces();
+    flushFaces();
+    renderer.render(scene, camera);
+    needsRender = false;
+    frames++;
+  }
+  statT += dt;
+  if (statT >= 0.5) {
+    if (settings.fps) {
+      let faces = 0, drawn = 0;
+      for (const S of F) { const n = S.used - S.free.length; faces += n; if (S.mesh.visible) drawn += n; }
+      $('fps').textContent = `${Math.round(frames / statT)} img/s\nfaces : ${fmt.format(drawn)} dessinées / ${fmt.format(faces)}\ncube : ${N}³`;
+    }
+    frames = 0; statT = 0;
+  }
+}
+
+/* =====================================================================
+   16. DÉMARRAGE
+   ===================================================================== */
+async function boot() {
+  try {
+    backend = ONLINE ? await createOnlineBackend() : createLocalBackend();
+    const info = await backend.start();
+    $('loading').textContent = 'Préparation du cube…';
+    N = info.size; NN = N * N; TOTAL = NN * N; HALF = (N - 1) / 2;
+    coreLo = N % 2 === 0 ? N / 2 - 1 : HALF - 1;
+    coreHi = N % 2 === 0 ? N / 2 : HALF + 1;
+    coreSize = coreHi - coreLo + 1;
+    hp = new Uint8Array(TOTAL).fill(MAX_HP);
+    slotOf = new Int32Array(TOTAL).fill(-1);
+    await backend.loadBlocks();
+    remaining = 0;
+    for (let i = 0; i < TOTAL; i++) if (hp[i] > 0) remaining++;
+    coreRemaining = 0;
+    for (let z = coreLo; z <= coreHi; z++) for (let y = coreLo; y <= coreHi; y++) for (let x = coreLo; x <= coreHi; x++)
+      if (hp[x + y * N + z * NN] > 0) coreRemaining++;
+    blockMat = makeBlockMaterial();
+    buildAllFaces();
+    camera.far = N * 10; camera.updateProjectionMatrix();
+    camera.position.copy(new THREE.Vector3(1, 0.75, 1.25).normalize().multiplyScalar(defaultDistance()));
+    backend.onMessage(onNetMessage);
+    backend.onPresence(names => { onlineNames = names; hudDirty = true; });
+    try { inventory = (await backend.inventory()) || {}; } catch (e) {}
+    try {
+      const mine = (await backend.leaderboard()).find(r => r.id === me.id);
+      if (mine) { myStats.hits = +mine.hits; myStats.blocks = +mine.blocks; }
+    } catch (e) {}
+    renderInvBar();
+    $('bAdmin').classList.toggle('hidden', !me.isAdmin);
+    if (coreRemaining === 0) onCoreDone(false);
+    $('loading').style.display = 'none';
+    ready = true;
+    if (!ONLINE) toast('Mode solo (aucun serveur configuré)');
+    loop();
+  } catch (e) {
+    console.error(e);
+    $('loading').style.display = 'flex';
+    $('loading').innerHTML = `⚠️ Impossible de démarrer :<br>${esc(e.message)}`;
+  }
+}
+boot();
+</script>
+</body>
+</html>
