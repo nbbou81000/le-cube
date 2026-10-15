@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0d0f14">
 <title>Le Cube — Qu'y a-t-il à l'intérieur ?</title>
 <style>
-  :root{--gold:#ffd34d;--bg:#0d0f14;--card:#16131c;--line:#ffffff26;--txt:#eef1f8}
+  :root{--gold:#ffd34d;--bg:#0d0f14;--card:#16131c;--line:#ffffff26;--txt:#eef1f8;--ok:#7fdc95;--bad:#ff9b9b}
   html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
     font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
   body{-webkit-user-select:none;user-select:none}
@@ -15,79 +15,86 @@
   button{font:inherit;font-size:14px;color:var(--txt);background:#ffffff14;border:1px solid var(--line);
     border-radius:10px;padding:9px 12px;cursor:pointer}
   button:active{transform:scale(.96)}
-  button:disabled{opacity:.35;cursor:default}
+  button:disabled{opacity:.35;cursor:default;transform:none}
   button.primary{background:#ffc83d;color:#1a1204;border-color:#ffc83d;font-weight:700}
   button.danger{border-color:#ff6b6b88;color:#ffb3b3}
+  button.small{padding:6px 10px;font-size:13px}
   input,select,textarea{font:inherit;font-size:16px;color:var(--txt);background:#0d0f14;border:1px solid var(--line);
-    border-radius:8px;padding:9px 10px;width:100%;box-sizing:border-box;-webkit-user-select:text;user-select:text}
+    border-radius:8px;padding:8px 10px;width:100%;box-sizing:border-box;-webkit-user-select:text;user-select:text}
+  input[type=number]{min-width:0}
   label{display:block;font-size:12px;opacity:.7;margin:10px 0 4px}
   .muted{opacity:.6;font-size:12px}
+  .ok{color:var(--ok)} .bad{color:var(--bad)}
 
   #hud{position:fixed;top:0;left:0;right:0;padding:calc(10px + env(safe-area-inset-top)) 12px 18px;
     text-align:center;pointer-events:none;background:linear-gradient(#0d0f14e6,#0d0f1400);z-index:3}
   #count{font-size:clamp(16px,4.6vw,24px);font-weight:700;font-variant-numeric:tabular-nums}
   #bar{margin:8px auto 0;width:min(420px,80vw);height:5px;border-radius:3px;background:#ffffff1f;overflow:hidden}
   #barFill{height:100%;width:0;background:linear-gradient(90deg,#6aa8ff,#c47dff,#ff7a59,#ffd34d)}
-  #sub{margin-top:6px;font-size:12px;opacity:.7;font-variant-numeric:tabular-nums}
+  #sub{margin-top:6px;font-size:12px;opacity:.75;font-variant-numeric:tabular-nums}
   #online{margin-top:3px;font-size:12px;color:#9fe3a8}
 
-  #feed{position:fixed;top:calc(100px + env(safe-area-inset-top));right:10px;display:flex;flex-direction:column;
+  #feed{position:fixed;top:calc(104px + env(safe-area-inset-top));right:10px;display:flex;flex-direction:column;
     gap:6px;align-items:flex-end;pointer-events:none;z-index:4;max-width:min(330px,82vw)}
   .toast{background:#16131ceb;border:1px solid var(--line);border-radius:10px;padding:7px 11px;font-size:13px;
     animation:tin .25s ease-out;transition:opacity .6s}
   .toast.big{border-color:#ffc83daa;background:#2a210eee;font-size:14px}
   @keyframes tin{from{transform:translateX(24px);opacity:0}}
 
-  #armed{position:fixed;left:50%;transform:translateX(-50%);top:calc(100px + env(safe-area-inset-top));z-index:4;
+  #armed{position:fixed;left:50%;transform:translateX(-50%);top:calc(104px + env(safe-area-inset-top));z-index:4;
     background:#2a210ef0;border:1px solid #ffc83d99;padding:6px 6px 6px 12px;border-radius:12px;display:flex;gap:10px;
     align-items:center;font-size:14px;white-space:nowrap}
   #armed button{padding:5px 10px}
-
   #help{position:fixed;left:50%;bottom:calc(112px + env(safe-area-inset-bottom));transform:translateX(-50%);
     background:#000a;border:1px solid #ffffff22;padding:9px 14px;border-radius:12px;font-size:13px;
     width:max-content;max-width:calc(100vw - 32px);box-sizing:border-box;text-align:center;pointer-events:none;transition:opacity .8s}
-  #fps{position:fixed;left:10px;bottom:calc(12px + env(safe-area-inset-bottom));font:11px ui-monospace,Menlo,monospace;
+  #fps{position:fixed;left:10px;bottom:calc(60px + env(safe-area-inset-bottom));font:11px ui-monospace,Menlo,monospace;
     opacity:.55;pointer-events:none;white-space:pre;line-height:1.5}
   #invBar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(62px + env(safe-area-inset-bottom));display:flex;gap:8px;z-index:3}
   #invBar button{font-size:20px;padding:5px 10px;position:relative;background:#16131cdd}
   #invBar button b{position:absolute;right:-5px;top:-7px;background:var(--gold);color:#000;font-size:10px;border-radius:8px;padding:1px 5px}
   #invBar button.on{border-color:var(--gold);box-shadow:0 0 14px #ffc83d99}
-  #tools{position:fixed;right:10px;left:10px;bottom:calc(10px + env(safe-area-inset-bottom));display:flex;gap:6px;justify-content:flex-end;z-index:3}
-  #tools button{background:#16131cdd}
-  #bTreasure{background:#ffc83d33!important;border-color:#ffc83d99}
+  #tools{position:fixed;right:8px;left:8px;bottom:calc(10px + env(safe-area-inset-bottom));display:flex;gap:5px;justify-content:flex-end;z-index:3}
+  #tools button{background:#16131cdd;font-size:17px;padding:8px 10px}
+  #bTreasure{background:#ffc83d33!important;border-color:#ffc83d99;font-size:14px!important}
 
-  .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#000b;z-index:10;padding:12px}
+  .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#000b;z-index:10;padding:10px}
   .modal.open{display:flex}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;width:min(480px,100%);
-    max-height:calc(100vh - 40px);overflow:auto;box-sizing:border-box}
-  .mhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;width:min(500px,100%);
+    max-height:calc(100vh - 30px);overflow:auto;box-sizing:border-box}
+  .mhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
   .mhead h2{margin:0;font-size:19px}
+  .tabs{display:flex;gap:6px;margin:4px 0 10px}
+  .tabs button{flex:1}
+  .tabs button.on{border-color:var(--gold);background:#ffc83d22}
   .sec{margin-top:16px;padding-top:12px;border-top:1px solid #ffffff14}
-  .sec h3{margin:0 0 8px;font-size:15px}
+  .sec h3,.card h3{margin:0 0 8px;font-size:15px}
   .item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #ffffff0f}
-  .item .ic{font-size:26px;width:34px;text-align:center}
+  .item .ic{font-size:24px;width:34px;text-align:center;flex:none}
   .item .tx{flex:1;min-width:0}
   .item .tx b{display:block}
-  .btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center}
+  .row{display:flex;gap:6px;align-items:center}
   .records{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .rec{background:#ffffff0a;border:1px solid #ffffff14;border-radius:10px;padding:8px 10px;font-size:13px}
   .rec b{display:block;color:var(--gold);font-size:14px;margin-top:2px}
   .pl{padding:9px 0;border-bottom:1px solid #ffffff0f;font-size:13px}
   .pl .nm{font-weight:700;font-size:15px}
-  .pl .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#5fd27a;margin-left:6px}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#5fd27a;margin-left:6px}
   .seg{display:flex;gap:6px;flex-wrap:wrap}
   .seg button.on{border-color:var(--gold);background:#ffc83d22}
+  .goldline{font-size:18px;font-weight:700;margin:2px 0 6px}
+  .mission{background:#ffffff0a;border:1px solid #ffffff14;border-radius:12px;padding:10px 12px;margin-bottom:8px}
+  .prog{height:6px;border-radius:3px;background:#ffffff1a;overflow:hidden;margin:8px 0 4px}
+  .prog i{display:block;height:100%;background:linear-gradient(90deg,#6aa8ff,#ffd34d)}
+  .offer{background:#ffffff0a;border:1px solid #ffffff14;border-radius:12px;padding:9px 12px;margin-bottom:8px;font-size:14px}
   input[type=range]{padding:0}
 
   #banner .card{text-align:center;border-color:#ffc83d66;box-shadow:0 0 60px #ffc83d33}
   #banner .big{font-size:20px;font-weight:800;color:var(--gold);margin-bottom:8px}
-
   #auth{background:radial-gradient(circle at 50% 30%,#1d1830,#0d0f14 70%);z-index:20}
   #auth h1{margin:0;font-size:26px;text-align:center}
   #auth .card{width:min(380px,100%)}
-  .tabs{display:flex;gap:6px;margin:14px 0 4px}
-  .tabs button{flex:1}
-  .tabs button.on{border-color:var(--gold);background:#ffc83d22}
   #aMsg{min-height:18px;font-size:13px;color:#ffb3b3;margin:10px 0 0;text-align:center}
   #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:15;
     font-size:15px;text-align:center;padding:20px}
@@ -109,7 +116,9 @@
 <div id="tools">
   <button id="bTreasure" class="hidden">✨ Trésor</button>
   <button id="bBoard" title="Classement">🏆</button>
-  <button id="bInv" title="Artefacts">🎒</button>
+  <button id="bMissions" title="Missions">📜</button>
+  <button id="bInv" title="Sac et atelier">🎒</button>
+  <button id="bShop" title="Boutique et marché">🏪</button>
   <button id="bAdmin" class="hidden" title="Administration">👑</button>
   <button id="bSettings" title="Réglages">⚙️</button>
 </div>
@@ -120,8 +129,8 @@
 </div></div>
 
 <div id="banner" class="modal"><div class="card">
-  <div class="big">✨ Le cœur du cube est atteint ✨</div>
-  <p>Quelque chose vous attendait au centre exact du cube…</p>
+  <div class="big">✨ Le cube est entièrement détruit ✨</div>
+  <p>Il ne reste plus rien… sauf ce qui vous attendait au centre exact du cube.</p>
   <div class="btns" style="justify-content:center">
     <button id="bView" class="primary">Voir le trésor</button>
     <button id="bBannerClose">Plus tard</button>
@@ -132,9 +141,9 @@
   <h1>🧊 Le Cube</h1>
   <p class="muted" style="text-align:center;margin:4px 0 0">Qu'y a-t-il à l'intérieur ?</p>
   <div id="vLogin">
-    <div class="tabs"><button id="tLogin" class="on">Connexion</button><button id="tSignup">Inscription</button></div>
+    <div class="tabs" style="margin-top:14px"><button id="tLogin" class="on">Connexion</button><button id="tSignup">Inscription</button></div>
     <div id="fPseudo" class="hidden"><label>Pseudo (visible par les autres)</label><input id="aPseudo" maxlength="20" autocomplete="nickname"></div>
-    <label>E-mail</label><input id="aEmail" type="email" autocomplete="email">
+    <label>E-mail (sert d'identifiant de connexion)</label><input id="aEmail" type="email" autocomplete="email">
     <label>Mot de passe (6 caractères minimum)</label><input id="aPass" type="password" autocomplete="current-password">
     <div class="btns"><button id="aGo" class="primary" style="flex:1">Se connecter</button></div>
   </div>
@@ -153,6 +162,966 @@
 
 <div id="loading">Chargement du cube…</div>
 
+<!-- Moteur du mode solo (utilisé seulement si Supabase n'est pas configuré) -->
+<script type="text/plain" id="soloSql">-- =====================================================================
+--  LE CUBE — installation / mise à jour Supabase  (version 2)
+--  À coller EN ENTIER dans Supabase > SQL Editor > New query, puis "Run".
+--  Relançable sans danger : la partie en cours, les comptes et les
+--  inventaires sont conservés lors d'une mise à jour.
+-- =====================================================================
+
+
+-- ---------------------------------------------------------------------
+-- 1. JOUEURS ET VALIDATION
+--    Le tout premier inscrit devient automatiquement administrateur.
+-- ---------------------------------------------------------------------
+create table if not exists public.profiles (
+  id         uuid primary key references auth.users(id) on delete cascade,
+  pseudo     text not null,
+  status     text not null default 'pending' check (status in ('pending', 'approved', 'refused')),
+  is_admin   boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare premier boolean;
+begin
+  select not exists (select 1 from public.profiles) into premier;
+  insert into public.profiles (id, pseudo, status, is_admin)
+  values (
+    new.id,
+    left(coalesce(nullif(trim(new.raw_user_meta_data ->> 'pseudo'), ''), split_part(new.email, '@', 1)), 20),
+    case when premier then 'approved' else 'pending' end,
+    premier
+  );
+  return new;
+end $$;
+
+drop trigger if exists le_cube_new_user on auth.users;
+create trigger le_cube_new_user after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+create or replace function public.is_approved() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and status = 'approved');
+$$;
+
+create or replace function public.is_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and status = 'approved' and is_admin);
+$$;
+
+
+-- ---------------------------------------------------------------------
+-- 2. TABLES
+-- ---------------------------------------------------------------------
+create table if not exists public.game (
+  id          int primary key default 1 check (id = 1),
+  size        int not null default 128,
+  started_at  timestamptz not null default now(),
+  revealed_at timestamptz
+);
+-- Règles réglables par l'admin (ajoutées en version 2)
+alter table public.game add column if not exists max_hp     int not null default 10;   -- clics pour casser un bloc
+alter table public.game add column if not exists gold_every int not null default 200;  -- 1 bloc sur X contient de l'or (0 = jamais)
+alter table public.game add column if not exists mat_every  int not null default 60;   -- 1 bloc sur X contient un matériau (0 = jamais)
+alter table public.game add column if not exists seed       int not null default floor(random() * 2000000000)::int;
+alter table public.game add column if not exists destroyed  bigint not null default 0;  -- blocs détruits (tenu à jour)
+
+create table if not exists public.treasure (
+  id         int primary key default 1 check (id = 1),
+  kind       text not null default 'noeud',
+  message    text not null default '',
+  image      text not null default '',
+  updated_at timestamptz not null default now()
+);
+
+-- Seuls les blocs abîmés ou détruits sont stockés (absent = intact)
+create table if not exists public.blocks (
+  i  int primary key,
+  hp smallint not null
+);
+
+-- Positions secrètes des artefacts (identiques pour tout le monde)
+create table if not exists public.artifacts (
+  i        int primary key,
+  kind     text not null,
+  found_by uuid references public.profiles(id) on delete set null,
+  found_at timestamptz
+);
+
+-- Inventaire : artefacts, matériaux et pièces d'or ('or')
+create table if not exists public.inventory (
+  player uuid not null references public.profiles(id) on delete cascade,
+  kind   text not null,
+  qty    int  not null default 0,
+  primary key (player, kind)
+);
+
+create table if not exists public.stats (
+  player          uuid primary key references public.profiles(id) on delete cascade,
+  hits            bigint not null default 0,
+  blocks          bigint not null default 0,
+  artifacts_found int not null default 0,
+  artifacts_used  int not null default 0,
+  best_break_ms   int,
+  best_cps        int not null default 0,
+  deepest         int not null default 0,
+  last_seen       timestamptz
+);
+alter table public.stats add column if not exists gold_found      int not null default 0;
+alter table public.stats add column if not exists materials_found int not null default 0;
+alter table public.stats add column if not exists crafted         int not null default 0;
+alter table public.stats add column if not exists trades          int not null default 0;
+alter table public.stats add column if not exists missions_done   int not null default 0;
+
+-- Boutique : prix en pièces d'or (0 = pas en vente)
+create table if not exists public.shop (
+  kind  text primary key,
+  price int not null default 0
+);
+insert into public.shop (kind, price) values
+  ('radar', 15), ('marteau', 20), ('foreuse', 25), ('bombe', 30), ('megabombe', 200)
+on conflict (kind) do nothing;
+
+-- Recettes de l'atelier
+create table if not exists public.recipes (
+  result      text primary key,
+  ingredients jsonb not null
+);
+insert into public.recipes (result, ingredients) values
+  ('radar',     '{"silex": 4, "fer": 1}'),
+  ('marteau',   '{"fer": 4, "or": 3}'),
+  ('bombe',     '{"poudre": 3, "fer": 2}'),
+  ('foreuse',   '{"cristal": 2, "fer": 3}'),
+  ('megabombe', '{"bombe": 3, "cristal": 3}')
+on conflict (result) do nothing;
+
+-- Marché entre joueurs : l'objet proposé est mis de côté jusqu'à la vente
+create table if not exists public.market (
+  id         bigserial primary key,
+  seller     uuid not null references public.profiles(id) on delete cascade,
+  give_kind  text not null,
+  give_qty   int  not null check (give_qty > 0),
+  want_kind  text not null,
+  want_qty   int  not null check (want_qty > 0),
+  created_at timestamptz not null default now()
+);
+
+-- Missions personnelles (3 par joueur)
+create table if not exists public.missions (
+  player     uuid not null references public.profiles(id) on delete cascade,
+  slot       int  not null check (slot between 1 and 3),
+  typ        text not null,             -- creuser | utiliser | livrer | trouver
+  item       text,
+  param      int  not null default 0,   -- creuser : couche minimale (0 = surface)
+  target     int  not null,
+  progress   int  not null default 0,
+  reward     int  not null,
+  created_at timestamptz not null default now(),
+  primary key (player, slot)
+);
+
+-- Aucun accès direct aux tables : tout passe par les fonctions ci-dessous.
+alter table public.profiles  enable row level security;
+alter table public.game      enable row level security;
+alter table public.treasure  enable row level security;
+alter table public.blocks    enable row level security;
+alter table public.artifacts enable row level security;
+alter table public.inventory enable row level security;
+alter table public.stats     enable row level security;
+alter table public.shop      enable row level security;
+alter table public.recipes   enable row level security;
+alter table public.market    enable row level security;
+alter table public.missions  enable row level security;
+
+insert into public.game (id) values (1) on conflict (id) do nothing;
+insert into public.treasure (id) values (1) on conflict (id) do nothing;
+-- recalcule le compteur à chaque installation / mise à jour
+update public.game set destroyed = (select count(*) from public.blocks where hp = 0) where id = 1;
+
+
+-- ---------------------------------------------------------------------
+-- 3. OUTILS INTERNES
+-- ---------------------------------------------------------------------
+-- Anciennes versions dont le format change
+drop function if exists public._destroy(int, uuid);
+drop function if exists public.get_leaderboard();
+
+create or replace function public._check_kind(k text) returns void
+language plpgsql immutable as $$
+begin
+  if k is null or k not in ('bombe', 'foreuse', 'marteau', 'radar', 'megabombe') then
+    raise exception 'Type d''artefact inconnu';
+  end if;
+end $$;
+
+create or replace function public._check_item(k text) returns void
+language plpgsql immutable as $$
+begin
+  if k is null or k not in ('bombe', 'foreuse', 'marteau', 'radar', 'megabombe', 'or', 'silex', 'fer', 'poudre', 'cristal') then
+    raise exception 'Objet inconnu';
+  end if;
+end $$;
+
+-- Couche d'un bloc : 0 = surface
+create or replace function public._depth(idx int, s int) returns int
+language sql immutable as $$
+  select least(idx % s, s - 1 - idx % s, (idx / s) % s, s - 1 - (idx / s) % s, idx / (s*s), s - 1 - idx / (s*s));
+$$;
+
+create or replace function public._is_core(idx int, s int) returns boolean
+language sql immutable as $$
+  with b as (
+    select case when s % 2 = 0 then s/2 - 1 else (s-1)/2 - 1 end as lo,
+           case when s % 2 = 0 then s/2     else (s-1)/2 + 1 end as hi
+  )
+  select (idx % s) between b.lo and b.hi
+     and ((idx / s) % s) between b.lo and b.hi
+     and (idx / (s*s)) between b.lo and b.hi
+  from b;
+$$;
+
+create or replace function public.core_done() returns boolean
+language sql stable security definer set search_path = public as $$
+  with g as (
+    select size as s,
+           case when size % 2 = 0 then size/2 - 1 else (size-1)/2 - 1 end as lo,
+           case when size % 2 = 0 then size/2     else (size-1)/2 + 1 end as hi
+    from public.game where id = 1
+  ), cells as (
+    select x + y*g.s + z*g.s*g.s as i
+    from g, generate_series(g.lo, g.hi) as x, generate_series(g.lo, g.hi) as y, generate_series(g.lo, g.hi) as z
+  )
+  select not exists (
+    select 1 from cells left join public.blocks b on b.i = cells.i where coalesce(b.hp, 1) > 0
+  );
+$$;
+
+-- Nombre de blocs du cœur (2×2×2 si la taille est paire, 3×3×3 sinon)
+create or replace function public._core_count(s int) returns int
+language sql immutable as $$ select case when s % 2 = 0 then 8 else 27 end; $$;
+
+-- Le cœur est scellé tant qu'il reste des blocs ailleurs dans le cube
+create or replace function public._sealed() returns boolean
+language sql stable security definer set search_path = public as $$
+  select destroyed < size::bigint * size * size - public._core_count(size) from public.game where id = 1;
+$$;
+
+-- Fin de partie : absolument tous les blocs sont détruits
+create or replace function public.all_done() returns boolean
+language sql stable security definer set search_path = public as $$
+  select destroyed >= size::bigint * size * size from public.game where id = 1;
+$$;
+
+-- Valeur indicative d'un objet en pièces d'or (missions)
+create or replace function public._value(k text) returns int
+language sql stable security definer set search_path = public as $$
+  select case k when 'silex' then 1 when 'fer' then 2 when 'poudre' then 3 when 'cristal' then 5 when 'or' then 1
+         else coalesce((select nullif(price, 0) from public.shop where kind = k), 20) end;
+$$;
+
+create or replace function public._add(p_uid uuid, p_kind text, p_qty int) returns void
+language sql security definer set search_path = public as $$
+  insert into public.inventory as inv (player, kind, qty) values (p_uid, p_kind, greatest(p_qty, 0))
+  on conflict (player, kind) do update set qty = greatest(inv.qty + p_qty, 0);
+$$;
+
+create or replace function public._take(p_uid uuid, p_kind text, p_qty int) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  update public.inventory set qty = qty - p_qty where player = p_uid and kind = p_kind and qty >= p_qty;
+  if not found then raise exception 'Pas assez de « % »', p_kind; end if;
+end $$;
+
+create or replace function public._stats(uid uuid, h int, b int, af int, au int, bms int, cps int, deep int)
+returns void language sql security definer set search_path = public as $$
+  insert into public.stats as st (player, hits, blocks, artifacts_found, artifacts_used, best_break_ms, best_cps, deepest, last_seen)
+  values (uid, h, b, af, au, bms, coalesce(cps, 0), coalesce(deep, 0), now())
+  on conflict (player) do update set
+    hits            = st.hits + excluded.hits,
+    blocks          = st.blocks + excluded.blocks,
+    artifacts_found = st.artifacts_found + excluded.artifacts_found,
+    artifacts_used  = st.artifacts_used + excluded.artifacts_used,
+    best_break_ms   = least(st.best_break_ms, excluded.best_break_ms),
+    best_cps        = greatest(st.best_cps, excluded.best_cps),
+    deepest         = greatest(st.deepest, excluded.deepest),
+    last_seen       = now();
+$$;
+
+create or replace function public._bump(p_uid uuid, p_gold int, p_mats int, p_craft int, p_trades int, p_missions int)
+returns void language sql security definer set search_path = public as $$
+  insert into public.stats as st (player, gold_found, materials_found, crafted, trades, missions_done, last_seen)
+  values (p_uid, p_gold, p_mats, p_craft, p_trades, p_missions, now())
+  on conflict (player) do update set
+    gold_found      = st.gold_found + excluded.gold_found,
+    materials_found = st.materials_found + excluded.materials_found,
+    crafted         = st.crafted + excluded.crafted,
+    trades          = st.trades + excluded.trades,
+    missions_done   = st.missions_done + excluded.missions_done,
+    last_seen       = now();
+$$;
+
+-- Butin d'un bloc : calculé à partir de sa position et d'une graine secrète,
+-- donc identique quel que soit le joueur qui le casse. Renvoie 'or:5', 'fer:1'… ou null.
+create or replace function public._loot(idx int) returns text
+language plpgsql stable security definer set search_path = public as $$
+declare g record; h1 float8; h2 float8; h3 float8; t float8;
+begin
+  select size, seed, gold_every, mat_every,
+         ((seed::bigint * 31 + 7) % 2147483647)::int as seed2,
+         ((seed::bigint + 99991) % 2147483647)::int as seed3
+    into g from public.game where id = 1;
+  h1 := (hashint4(idx # g.seed)::bigint + 2147483648) / 4294967296.0;
+  if g.gold_every > 0 and h1 < 1.0 / g.gold_every then
+    h3 := (hashint4(idx # g.seed3)::bigint + 2147483648) / 4294967296.0;
+    return 'or:' || case when h3 < 0.025 then 20 when h3 < 0.2 then 5 else 1 end;   -- 2,5 % de bourses de 20
+  end if;
+  h2 := (hashint4(idx # g.seed2)::bigint + 2147483648) / 4294967296.0;
+  if g.mat_every > 0 and h2 < 1.0 / g.mat_every then
+    h3 := h2 * g.mat_every;
+    t := public._depth(idx, g.size)::float8 / greatest(1, (g.size - 1) / 2);
+    return case
+      when t < 0.25 then (case when h3 < 0.7 then 'silex' else 'fer' end)
+      when t < 0.5  then (case when h3 < 0.25 then 'silex' when h3 < 0.75 then 'fer' else 'poudre' end)
+      when t < 0.75 then (case when h3 < 0.3 then 'fer' when h3 < 0.8 then 'poudre' else 'cristal' end)
+      else (case when h3 < 0.4 then 'poudre' else 'cristal' end)
+    end || ':1';
+  end if;
+  return null;
+end $$;
+
+-- Récompenses d'un bloc détruit : artefact caché + butin. Renvoie {artefact, butin}.
+create or replace function public._reward(idx int, uid uuid) returns text[]
+language plpgsql security definer set search_path = public as $$
+declare a text; l text; lk text; lq int;
+begin
+  update public.artifacts set found_by = uid, found_at = now()
+    where artifacts.i = idx and found_by is null
+    returning kind into a;
+  if a is not null then perform public._add(uid, a, 1); end if;
+  l := public._loot(idx);
+  if l is not null then
+    lk := split_part(l, ':', 1); lq := split_part(l, ':', 2)::int;
+    perform public._add(uid, lk, lq);
+    perform public._bump(uid, case when lk = 'or' then lq else 0 end, case when lk <> 'or' then lq else 0 end, 0, 0, 0);
+  end if;
+  return array[coalesce(a, ''), coalesce(l, '')];
+end $$;
+
+-- Détruit un bloc. Renvoie null s'il l'était déjà, sinon {artefact, butin}.
+create or replace function public._destroy(idx int, uid uuid) returns text[]
+language plpgsql security definer set search_path = public as $$
+declare v smallint; s int;
+begin
+  select size into s from public.game where id = 1;
+  if public._is_core(idx, s) and public._sealed() then return null; end if;   -- cœur scellé
+  insert into public.blocks as b (i, hp) values (idx, 0)
+    on conflict (i) do update set hp = 0 where b.hp > 0
+    returning b.hp into v;
+  if v is null then return null; end if;
+  return public._reward(idx, uid);
+end $$;
+
+-- Cache des artefacts au hasard (121 pour un cube 128³, proportionnel ailleurs)
+create or replace function public._regen(s int) returns void
+language sql security definer set search_path = public as $$
+  insert into public.artifacts (i, kind)
+  select floor(random() * (s::bigint * s * s))::int, k.kind
+  from (values ('bombe', 40), ('foreuse', 30), ('marteau', 25), ('radar', 20), ('megabombe', 6)) as k(kind, cnt),
+       generate_series(1, greatest(1, round(k.cnt * (s::numeric * s * s) / 2097152)::int))
+  on conflict (i) do nothing;
+$$;
+
+-- Nouvelle mission pour un joueur
+create or replace function public._new_mission(p_uid uuid, p_slot int) returns void
+language plpgsql security definer set search_path = public as $$
+declare r float8 := random(); s int; dp int; t text; it text := null; pa int := 0; tg int; rw int;
+  arts text[] := array['bombe', 'foreuse', 'marteau', 'radar'];
+  mats text[] := array['silex', 'fer', 'poudre', 'cristal'];
+begin
+  select size into s from public.game where id = 1;
+  select coalesce(max(deepest), 0) into dp from public.stats where player = p_uid;
+  if r < 0.35 then
+    t := 'creuser'; pa := least(greatest((s - 1) / 2 - 3, 0), dp + floor(random() * 4)::int);
+    tg := 15 + floor(random() * 31)::int; rw := greatest(2, tg / 6 + pa / 3);
+  elsif r < 0.55 then
+    t := 'utiliser'; it := arts[1 + floor(random() * 4)::int]; tg := 1; rw := public._value(it) / 2 + 5;
+  elsif r < 0.8 then
+    t := 'livrer';
+    if random() < 0.75 then
+      it := mats[1 + floor(random() * 4)::int]; tg := 2 + floor(random() * 4)::int; rw := tg * public._value(it) * 2 + 2;
+    else
+      it := arts[1 + floor(random() * 4)::int]; tg := 1; rw := (public._value(it) * 3) / 2;
+    end if;
+  else
+    t := 'trouver'; it := mats[1 + floor(random() * 4)::int]; tg := 1 + floor(random() * 3)::int;
+    rw := tg * public._value(it) * 2 + 3;
+  end if;
+  insert into public.missions as ms (player, slot, typ, item, param, target, progress, reward, created_at)
+  values (p_uid, p_slot, t, it, pa, tg, 0, rw, now())
+  on conflict (player, slot) do update set typ = excluded.typ, item = excluded.item, param = excluded.param,
+    target = excluded.target, progress = 0, reward = excluded.reward, created_at = now();
+end $$;
+
+-- Fait avancer les missions et paie celles qui sont terminées. Renvoie les messages à afficher.
+create or replace function public._missions_progress(p_uid uuid, p_depths int[], p_loots text[], p_used text)
+returns text[] language plpgsql security definer set search_path = public as $$
+declare r record; msgs text[] := '{}';
+begin
+  if coalesce(array_length(p_depths, 1), 0) > 0 then
+    update public.missions m set progress = m.progress + (select count(*) from unnest(p_depths) as dd where dd >= m.param)
+     where m.player = p_uid and m.typ = 'creuser';
+  end if;
+  if coalesce(array_length(p_loots, 1), 0) > 0 then
+    update public.missions m set progress = m.progress + coalesce((
+        select sum(split_part(l, ':', 2)::int) from unnest(p_loots) as l where split_part(l, ':', 1) = m.item), 0)
+     where m.player = p_uid and m.typ = 'trouver';
+  end if;
+  if p_used is not null then
+    update public.missions set progress = progress + 1 where player = p_uid and typ = 'utiliser' and item = p_used;
+  end if;
+  for r in select * from public.missions
+           where player = p_uid and typ in ('creuser', 'trouver', 'utiliser') and progress >= target loop
+    perform public._add(p_uid, 'or', r.reward);
+    perform public._bump(p_uid, r.reward, 0, 0, 0, 1);
+    msgs := msgs || ('📜 Mission accomplie ! +' || r.reward || ' 🪙');
+    perform public._new_mission(p_uid, r.slot);
+  end loop;
+  return msgs;
+end $$;
+
+revoke execute on function public._destroy(int, uuid) from public, anon, authenticated;
+revoke execute on function public._reward(int, uuid) from public, anon, authenticated;
+revoke execute on function public._loot(int) from public, anon, authenticated;
+revoke execute on function public._stats(uuid, int, int, int, int, int, int, int) from public, anon, authenticated;
+revoke execute on function public._bump(uuid, int, int, int, int, int) from public, anon, authenticated;
+revoke execute on function public._add(uuid, text, int) from public, anon, authenticated;
+revoke execute on function public._take(uuid, text, int) from public, anon, authenticated;
+revoke execute on function public._regen(int) from public, anon, authenticated;
+revoke execute on function public._new_mission(uuid, int) from public, anon, authenticated;
+revoke execute on function public._missions_progress(uuid, int[], text[], text) from public, anon, authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- 4. FONCTIONS DU JEU
+-- ---------------------------------------------------------------------
+create or replace function public.me() returns json
+language sql stable security definer set search_path = public as $$
+  select json_build_object('id', id, 'pseudo', pseudo, 'status', status, 'is_admin', is_admin)
+  from public.profiles where id = auth.uid();
+$$;
+
+create or replace function public.game_state() returns json
+language sql stable security definer set search_path = public as $$
+  select case when public.is_approved() then json_build_object(
+    'size', size, 'revealed', revealed_at is not null, 'max_hp', max_hp, 'destroyed', destroyed,
+    'gold_every', gold_every, 'mat_every', mat_every,
+    'shop', (select coalesce(json_object_agg(kind, price), '{}'::json) from public.shop),
+    'recipes', (select coalesce(json_object_agg(result, ingredients), '{}'::json) from public.recipes)
+  ) end
+  from public.game where id = 1;
+$$;
+
+create or replace function public.get_blocks() returns text
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_approved() then raise exception 'Accès non autorisé'; end if;
+  return (select string_agg(i::text || ':' || hp::text, ',') from public.blocks);
+end $$;
+
+-- Coups groupés. Renvoie { r: [[index, pv, artefact, butin], ...], msgs: [...] }
+create or replace function public.hit_blocks(idx int[], n int[], best_ms int default null, cps int default null, deep int default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  uid uuid := auth.uid(); g record; k int; m int; v smallint; d text[];
+  total int := 0; broke int := 0; nf int := 0; sealed boolean;
+  res jsonb := '[]'::jsonb; depths int[] := '{}'; loots text[] := '{}'; msgs text[];
+begin
+  if not public.is_approved() then raise exception 'Accès non autorisé'; end if;
+  if idx is null or coalesce(array_length(idx, 1), 0) = 0 then return jsonb_build_object('r', res, 'msgs', '[]'::jsonb); end if;
+  if array_length(idx, 1) > 500 then raise exception 'Trop de coups envoyés en même temps'; end if;
+  select * into g from public.game where id = 1;
+  sealed := public._sealed();
+  for k in 1 .. array_length(idx, 1) loop
+    continue when idx[k] is null or idx[k] < 0 or idx[k] >= g.size * g.size * g.size;
+    if sealed and public._is_core(idx[k], g.size) then     -- cœur scellé : le coup ne compte pas
+      res := res || jsonb_build_array(jsonb_build_array(idx[k],
+        coalesce((select b.hp from public.blocks b where b.i = idx[k]), g.max_hp), '', 'scelle'));
+      continue;
+    end if;
+    m := least(greatest(coalesce(n[k], 1), 1), g.max_hp);
+    v := null; d := null;
+    insert into public.blocks as b (i, hp) values (idx[k], greatest(g.max_hp - m, 0))
+      on conflict (i) do update set hp = greatest(b.hp - m, 0) where b.hp > 0
+      returning b.hp into v;
+    if v is null then
+      res := res || jsonb_build_array(jsonb_build_array(idx[k], 0, '', ''));
+      continue;
+    end if;
+    total := total + m;
+    if v = 0 then
+      broke := broke + 1;
+      d := public._reward(idx[k], uid);
+      depths := depths || public._depth(idx[k], g.size);
+      if d[1] <> '' then nf := nf + 1; end if;
+      if d[2] <> '' then loots := loots || d[2]; end if;
+    end if;
+    res := res || jsonb_build_array(jsonb_build_array(idx[k], v, coalesce(d[1], ''), coalesce(d[2], '')));
+  end loop;
+  perform public._stats(uid, total, broke, nf, 0, best_ms, cps, deep);
+  msgs := public._missions_progress(uid, depths, loots, null);
+  if broke > 0 then
+    update public.game set destroyed = destroyed + broke where id = 1;
+    update public.game set revealed_at = now() where id = 1 and revealed_at is null and public.all_done();
+  end if;
+  return jsonb_build_object('r', res, 'msgs', to_jsonb(coalesce(msgs, '{}')));
+end $$;
+
+-- Utiliser un artefact. dir = 0..5 (+x, -x, +y, -y, +z, -z) pour le laser.
+create or replace function public.use_artifact(k text, center int, dir int default 0)
+returns json language plpgsql security definer set search_path = public as $$
+declare
+  uid uuid := auth.uid(); s int; cx int; cy int; cz int; r int;
+  dx int := 0; dy int := 0; dz int := 0; px int; py int; pz int; cell int; d text[];
+  destroyed int[] := '{}'; found_list jsonb := '[]'::jsonb; nf int := 0; radar int := -1;
+  depths int[] := '{}'; loots text[] := '{}'; msgs text[];
+  cells int[] := '{}'; nd int;
+begin
+  if not public.is_approved() then raise exception 'Accès non autorisé'; end if;
+  perform public._check_kind(k);
+  perform public._take(uid, k, 1);
+  select size into s from public.game where id = 1;
+  if center is null or center < 0 or center >= s*s*s then
+    center := (s/2) + (s/2)*s + (s/2)*s*s;
+  end if;
+  cx := center % s; cy := (center / s) % s; cz := center / (s*s);
+
+  if k in ('bombe', 'megabombe') then
+    r := case when k = 'bombe' then 1 else 3 end;
+    for pz in greatest(cz - r, 0) .. least(cz + r, s - 1) loop
+      for py in greatest(cy - r, 0) .. least(cy + r, s - 1) loop
+        for px in greatest(cx - r, 0) .. least(cx + r, s - 1) loop
+          cells := cells || (px + py*s + pz*s*s);
+        end loop;
+      end loop;
+    end loop;
+  elsif k = 'foreuse' then
+    dx := case dir when 0 then 1 when 1 then -1 else 0 end;
+    dy := case dir when 2 then 1 when 3 then -1 else 0 end;
+    dz := case dir when 4 then 1 when 5 then -1 else 0 end;
+    for r in 0 .. 14 loop
+      px := cx + dx*r; py := cy + dy*r; pz := cz + dz*r;
+      exit when px < 0 or py < 0 or pz < 0 or px >= s or py >= s or pz >= s;
+      cells := cells || (px + py*s + pz*s*s);
+    end loop;
+  elsif k = 'radar' then
+    select ar.i into radar from public.artifacts ar
+      where ar.found_by is null
+      order by abs(ar.i % s - cx) + abs((ar.i / s) % s - cy) + abs(ar.i / (s*s) - cz)
+      limit 1;
+    radar := coalesce(radar, -1);
+  end if;
+
+  if coalesce(array_length(cells, 1), 0) > 0 then
+    foreach cell in array cells loop
+      d := public._destroy(cell, uid);
+      if d is not null then
+        destroyed := destroyed || cell;
+        depths := depths || public._depth(cell, s);
+        if d[1] <> '' then
+          nf := nf + 1;
+          found_list := found_list || jsonb_build_array(jsonb_build_object('i', cell, 'kind', d[1]));
+        end if;
+        if d[2] <> '' then loots := loots || d[2]; end if;
+      end if;
+    end loop;
+  end if;
+
+  perform public._stats(uid, 0, coalesce(array_length(destroyed, 1), 0), nf, 1, null, null, null);
+  msgs := public._missions_progress(uid, depths, loots, k);
+  nd := coalesce(array_length(destroyed, 1), 0);
+  if nd > 0 then
+    update public.game as gm set destroyed = gm.destroyed + nd where gm.id = 1;
+    update public.game set revealed_at = now() where id = 1 and revealed_at is null and public.all_done();
+  end if;
+  return json_build_object('destroyed', destroyed, 'found', found_list, 'loot', loots, 'radar', radar,
+                           'msgs', coalesce(msgs, '{}'));
+end $$;
+
+create or replace function public.get_inventory() returns json
+language sql stable security definer set search_path = public as $$
+  select coalesce(json_object_agg(kind, qty), '{}'::json)
+  from public.inventory where player = auth.uid() and qty > 0;
+$$;
+
+-- Donner n'importe quel objet (artefact, matériau, or) à un autre joueur
+create or replace function public.give_item(to_player uuid, k text, qty int default 1) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_approved() then raise exception 'Accès non autorisé'; end if;
+  perform public._check_item(k);
+  if qty is null or qty < 1 or qty > 9999 then raise exception 'Quantité invalide'; end if;
+  if to_player = auth.uid() then raise exception 'Tu ne peux pas te faire un cadeau à toi-même'; end if;
+  if not exists (select 1 from public.profiles where id = to_player and status = 'approved') then
+    raise exception 'Joueur inconnu';
+  end if;
+  perform public._take(auth.uid(), k, qty);
+  perform public._add(to_player, k, qty);
+end $$;
+
+-- (ancienne version, gardée pour compatibilité)
+create or replace function public.give_artifact(to_player uuid, k text) returns void
+language sql security definer set search_path = public as $$
+  select public.give_item(to_player, k, 1);
+$$;
+
+-- ----- Boutique et atelier -----
+create or replace function public.shop_buy(p_kind text, p_qty int default 1) returns void
+language plpgsql security definer set search_path = public as $$
+declare pr int;
+begin
+  if not public.is_approved() then raise exception 'Accès non autorisé'; end if;
+  perform public._check_kind(p_kind);
+  if p_qty is null or p_qty < 1 or p_qty > 99 then raise exception 'Quantité invalide'; end if;
+  select price into pr from public.shop where kind = p_kind;
+  if coalesce(pr, 0) <= 0 then raise exception 'Cet artefact n''est pas en vente'; end if;
+  perform public._take(auth.uid(), 'or', pr * p_qty);
+  perform public._add(auth.uid(), p_kind, p_qty);
+end $$;
+
+create or replace function public.craft(p_kind text) returns void
+language plpgsql security definer set search_path = public as $$
+declare ing jsonb; e record;
+begin
+  if not public.is_approved() then raise exception 'Accès non autorisé'; end if;
+  select ingredients into ing from public.recipes where result = p_kind;
+  if ing is null then raise exception 'Pas de recette pour cet objet'; end if;
+  for e in select key, value::int as q from jsonb_each_text(ing) loop
+    perform public._take(auth.uid(), e.key, e.q);
+  end loop;
+  perform public._add(auth.uid(), p_kind, 1);
+  perform public._bump(auth.uid(), 0, 0, 1, 0, 0);
+end $$;
+
+-- ----- Marché -----
+create or replace function public.market_list() returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_approved() then raise exception 'Accès non autorisé'; end if;
+  return (select coalesce(json_agg(json_build_object(
+      'id', m.id, 'seller', m.seller, 'pseudo', p.pseudo, 'give_kind', m.give_kind, 'give_qty', m.give_qty,
+      'want_kind', m.want_kind, 'want_qty', m.want_qty, 'created_at', m.created_at) order by m.created_at desc), '[]'::json)
+    from public.market m join public.profiles p on p.id = m.seller);
+end $$;
+
+create or replace function public.market_create(p_give text, p_give_qty int, p_want text, p_want_qty int) returns bigint
+language plpgsql security definer set search_path = public as $$
+declare new_id bigint;
+begin
+  if not public.is_approved() then raise exception 'Accès non autorisé'; end if;
+  perform public._check_item(p_give); perform public._check_item(p_want);
+  if p_give = p_want then raise exception 'Choisis deux objets différents'; end if;
+  if p_give_qty < 1 or p_give_qty > 9999 or p_want_qty < 1 or p_want_qty > 9999 then raise exception 'Quantité invalide'; end if;
+  if (select count(*) from public.market where seller = auth.uid()) >= 10 then
+    raise exception 'Maximum 10 offres en même temps';
+  end if;
+  perform public._take(auth.uid(), p_give, p_give_qty);   -- mis de côté jusqu'à la vente
+  insert into public.market (seller, give_kind, give_qty, want_kind, want_qty)
+    values (auth.uid(), p_give, p_give_qty, p_want, p_want_qty) returning id into new_id;
+  return new_id;
+end $$;
+
+create or replace function public.market_cancel(p_id bigint) returns void
+language plpgsql security definer set search_path = public as $$
+declare o record;
+begin
+  select * into o from public.market where id = p_id for update;
+  if not found then raise exception 'Offre introuvable'; end if;
+  if o.seller <> auth.uid() and not public.is_admin() then raise exception 'Ce n''est pas ton offre'; end if;
+  delete from public.market where id = p_id;
+  perform public._add(o.seller, o.give_kind, o.give_qty);
+end $$;
+
+create or replace function public.market_accept(p_id bigint) returns json
+language plpgsql security definer set search_path = public as $$
+declare o record;
+begin
+  if not public.is_approved() then raise exception 'Accès non autorisé'; end if;
+  select * into o from public.market where id = p_id for update;
+  if not found then raise exception 'Offre déjà prise ou retirée'; end if;
+  if o.seller = auth.uid() then raise exception 'C''est ta propre offre'; end if;
+  perform public._take(auth.uid(), o.want_kind, o.want_qty);
+  perform public._add(o.seller, o.want_kind, o.want_qty);
+  perform public._add(auth.uid(), o.give_kind, o.give_qty);
+  delete from public.market where id = p_id;
+  perform public._bump(auth.uid(), 0, 0, 0, 1, 0);
+  perform public._bump(o.seller, 0, 0, 0, 1, 0);
+  return json_build_object('seller', o.seller, 'give_kind', o.give_kind, 'give_qty', o.give_qty,
+                           'want_kind', o.want_kind, 'want_qty', o.want_qty);
+end $$;
+
+-- ----- Missions -----
+create or replace function public.get_missions() returns json
+language plpgsql security definer set search_path = public as $$
+declare sl int;
+begin
+  if not public.is_approved() then raise exception 'Accès non autorisé'; end if;
+  for sl in 1 .. 3 loop
+    if not exists (select 1 from public.missions where player = auth.uid() and slot = sl) then
+      perform public._new_mission(auth.uid(), sl);
+    end if;
+  end loop;
+  return (select json_agg(json_build_object('slot', slot, 'typ', typ, 'item', item, 'param', param,
+            'target', target, 'progress', least(progress, target), 'reward', reward) order by slot)
+          from public.missions where player = auth.uid());
+end $$;
+
+create or replace function public.deliver_mission(p_slot int) returns int
+language plpgsql security definer set search_path = public as $$
+declare r record;
+begin
+  if not public.is_approved() then raise exception 'Accès non autorisé'; end if;
+  select * into r from public.missions where player = auth.uid() and slot = p_slot and typ = 'livrer' for update;
+  if not found then raise exception 'Mission introuvable'; end if;
+  perform public._take(auth.uid(), r.item, r.target);
+  perform public._add(auth.uid(), 'or', r.reward);
+  perform public._bump(auth.uid(), r.reward, 0, 0, 0, 1);
+  perform public._new_mission(auth.uid(), p_slot);
+  return r.reward;
+end $$;
+
+create or replace function public.reroll_mission(p_slot int) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_approved() then raise exception 'Accès non autorisé'; end if;
+  if p_slot not between 1 and 3 then raise exception 'Mission introuvable'; end if;
+  perform public._take(auth.uid(), 'or', 1);
+  perform public._new_mission(auth.uid(), p_slot);
+end $$;
+
+create or replace function public.get_leaderboard()
+returns table (id uuid, pseudo text, hits bigint, blocks bigint, artifacts_found int, artifacts_used int,
+               best_break_ms int, best_cps int, deepest int, last_seen timestamptz,
+               gold int, gold_found int, materials_found int, crafted int, trades int, missions_done int)
+language sql stable security definer set search_path = public as $$
+  select p.id, p.pseudo, coalesce(s.hits, 0), coalesce(s.blocks, 0), coalesce(s.artifacts_found, 0),
+         coalesce(s.artifacts_used, 0), s.best_break_ms, coalesce(s.best_cps, 0), coalesce(s.deepest, 0), s.last_seen,
+         coalesce((select iv.qty from public.inventory iv where iv.player = p.id and iv.kind = 'or'), 0),
+         coalesce(s.gold_found, 0), coalesce(s.materials_found, 0), coalesce(s.crafted, 0),
+         coalesce(s.trades, 0), coalesce(s.missions_done, 0)
+  from public.profiles p left join public.stats s on s.player = p.id
+  where p.status = 'approved' and public.is_approved()
+  order by coalesce(s.blocks, 0) desc, coalesce(s.hits, 0) desc;
+$$;
+
+create or replace function public.get_treasure() returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if public.is_admin() or (public.is_approved() and public.all_done()) then
+    return (select json_build_object('kind', kind, 'message', message, 'image', image)
+            from public.treasure where id = 1);
+  end if;
+  return null;
+end $$;
+
+
+-- ---------------------------------------------------------------------
+-- 5. FONCTIONS ADMIN
+-- ---------------------------------------------------------------------
+create or replace function public.set_treasure(k text, msg text, img text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur'; end if;
+  if (select revealed_at from public.game where id = 1) is not null then
+    raise exception 'Le trésor a déjà été révélé';
+  end if;
+  update public.treasure
+     set kind = coalesce(k, 'noeud'), message = left(coalesce(msg, ''), 200),
+         image = coalesce(img, ''), updated_at = now()
+   where id = 1;
+end $$;
+
+create or replace function public.admin_players()
+returns table (id uuid, pseudo text, email text, status text, is_admin boolean, created_at timestamptz)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur'; end if;
+  return query
+    select p.id, p.pseudo, u.email::text, p.status, p.is_admin, p.created_at
+    from public.profiles p join auth.users u on u.id = p.id
+    order by p.created_at desc;
+end $$;
+
+create or replace function public.admin_set_status(p uuid, s text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur'; end if;
+  if s not in ('pending', 'approved', 'refused') then raise exception 'Statut inconnu'; end if;
+  if p = auth.uid() then raise exception 'Tu ne peux pas changer ton propre statut'; end if;
+  update public.profiles set status = s where profiles.id = p;
+end $$;
+
+-- Règles : clics par bloc, rareté de l'or et des matériaux (modifiables à tout moment)
+create or replace function public.admin_set_config(p_max_hp int, p_gold_every int, p_mat_every int) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur'; end if;
+  if p_max_hp < 1 or p_max_hp > 100 then raise exception 'Clics par bloc : entre 1 et 100'; end if;
+  if p_gold_every < 0 or p_gold_every > 1000000 or p_mat_every < 0 or p_mat_every > 1000000 then
+    raise exception 'Rareté invalide';
+  end if;
+  update public.game set max_hp = p_max_hp, gold_every = p_gold_every, mat_every = p_mat_every where id = 1;
+  -- un bloc entamé ne peut pas avoir plus de PV que le nouveau maximum
+  update public.blocks set hp = p_max_hp where hp > p_max_hp;
+end $$;
+
+create or replace function public.admin_set_price(p_kind text, p_price int) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur'; end if;
+  perform public._check_kind(p_kind);
+  if p_price < 0 or p_price > 1000000 then raise exception 'Prix invalide'; end if;
+  insert into public.shop (kind, price) values (p_kind, p_price)
+    on conflict (kind) do update set price = excluded.price;
+end $$;
+
+create or replace function public.admin_new_cube(new_size int) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur'; end if;
+  if new_size < 10 or new_size > 256 then raise exception 'Taille entre 10 et 256'; end if;
+  truncate public.blocks;
+  delete from public.artifacts;
+  delete from public.inventory;
+  delete from public.stats;
+  delete from public.market;
+  delete from public.missions;
+  update public.game set size = new_size, started_at = now(), revealed_at = null, destroyed = 0,
+         seed = floor(random() * 2000000000)::int where id = 1;
+  perform public._regen(new_size);
+end $$;
+
+create or replace function public.admin_artifacts() returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur'; end if;
+  return json_build_object(
+    'kinds', (select coalesce(json_object_agg(t.kind, json_build_object('hidden', t.n_hidden, 'found', t.n_found)), '{}'::json)
+              from (select a.kind, count(*) filter (where a.found_by is null) as n_hidden,
+                           count(*) filter (where a.found_by is not null) as n_found
+                    from public.artifacts a group by a.kind) t),
+    'inventories', (select coalesce(json_agg(json_build_object('id', p.id, 'pseudo', p.pseudo, 'kind', iv.kind, 'qty', iv.qty)
+                                             order by p.pseudo, iv.kind), '[]'::json)
+                    from public.inventory iv join public.profiles p on p.id = iv.player where iv.qty > 0)
+  );
+end $$;
+
+create or replace function public.admin_add_artifacts(k text, cnt int, min_layer int default 0, max_layer int default 999)
+returns int language plpgsql security definer set search_path = public as $$
+declare s int; lo int; hi int; added int;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur'; end if;
+  perform public._check_kind(k);
+  if cnt is null or cnt < 1 or cnt > 500 then raise exception 'Quantité entre 1 et 500'; end if;
+  select size into s from public.game where id = 1;
+  min_layer := greatest(coalesce(min_layer, 0), 0);
+  max_layer := least(coalesce(max_layer, 999), (s - 1) / 2);
+  if min_layer > max_layer then raise exception 'Couches invalides'; end if;
+  lo := min_layer; hi := s - 1 - min_layer;
+  with cand as (
+    select distinct (lo + floor(random() * (hi - lo + 1))::int)
+                  + (lo + floor(random() * (hi - lo + 1))::int) * s
+                  + (lo + floor(random() * (hi - lo + 1))::int) * s * s as cell
+    from generate_series(1, cnt * 80)
+  )
+  insert into public.artifacts (i, kind)
+  select cand.cell, k from cand
+  left join public.blocks b on b.i = cand.cell
+  where coalesce(b.hp, 1) > 0
+    and public._depth(cand.cell, s) <= max_layer
+    and not exists (select 1 from public.artifacts a where a.i = cand.cell)
+  order by random()
+  limit cnt
+  on conflict (i) do nothing;
+  get diagnostics added = row_count;
+  return added;
+end $$;
+
+create or replace function public.admin_remove_artifacts(k text, cnt int default null)
+returns int language plpgsql security definer set search_path = public as $$
+declare removed int;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur'; end if;
+  perform public._check_kind(k);
+  delete from public.artifacts where i in (
+    select i from public.artifacts where kind = k and found_by is null order by random() limit cnt
+  );
+  get diagnostics removed = row_count;
+  return removed;
+end $$;
+
+-- Donner (delta > 0) ou reprendre (delta < 0) n'importe quel objet à un joueur
+create or replace function public.admin_set_inventory(p uuid, k text, delta int)
+returns int language plpgsql security definer set search_path = public as $$
+declare q int;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur'; end if;
+  perform public._check_item(k);
+  if not exists (select 1 from public.profiles where id = p) then raise exception 'Joueur inconnu'; end if;
+  insert into public.inventory as inv (player, kind, qty) values (p, k, greatest(coalesce(delta, 0), 0))
+    on conflict (player, kind) do update set qty = greatest(inv.qty + coalesce(delta, 0), 0)
+    returning qty into q;
+  return q;
+end $$;
+
+-- Premier remplissage des artefacts
+do $$
+begin
+  if not exists (select 1 from public.artifacts) then
+    perform public._regen((select size from public.game where id = 1));
+  end if;
+end $$;
+
+
+-- ---------------------------------------------------------------------
+-- 6. PHOTO DU TRÉSOR (stockage privé)
+-- ---------------------------------------------------------------------
+insert into storage.buckets (id, name, public) values ('tresor', 'tresor', false)
+  on conflict (id) do nothing;
+
+drop policy if exists "le_cube_tresor_lire" on storage.objects;
+create policy "le_cube_tresor_lire" on storage.objects for select to authenticated
+  using (bucket_id = 'tresor' and (public.is_admin() or (public.is_approved() and public.all_done())));
+
+drop policy if exists "le_cube_tresor_ajouter" on storage.objects;
+create policy "le_cube_tresor_ajouter" on storage.objects for insert to authenticated
+  with check (bucket_id = 'tresor' and public.is_admin());
+
+drop policy if exists "le_cube_tresor_modifier" on storage.objects;
+create policy "le_cube_tresor_modifier" on storage.objects for update to authenticated
+  using (bucket_id = 'tresor' and public.is_admin());
+
+drop policy if exists "le_cube_tresor_supprimer" on storage.objects;
+create policy "le_cube_tresor_supprimer" on storage.objects for delete to authenticated
+  using (bucket_id = 'tresor' and public.is_admin());
+
+
+-- ---------------------------------------------------------------------
+-- 7. TEMPS RÉEL PRIVÉ
+-- ---------------------------------------------------------------------
+drop policy if exists "le_cube_temps_reel_lire" on realtime.messages;
+create policy "le_cube_temps_reel_lire" on realtime.messages for select to authenticated
+  using (public.is_approved());
+
+drop policy if exists "le_cube_temps_reel_ecrire" on realtime.messages;
+create policy "le_cube_temps_reel_ecrire" on realtime.messages for insert to authenticated
+  with check (public.is_approved());
+
+-- Fin. Tu peux fermer cette page.
+</script>
+
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -166,18 +1135,17 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 /* =====================================================================
-   0. CONNEXION SUPABASE — LES DEUX SEULES LIGNES À REMPLIR
-   Laisser vide = mode solo (pour tester tout seul, sans compte).
+   0. CONNEXION SUPABASE
+   Laisser vide = mode solo (même moteur de jeu, sauvegardé dans le navigateur).
    ===================================================================== */
-const SUPABASE_URL = 'https://cdylpulhbbzjbyxyqizp.supabase.co';   // exemple : 'https://abcdefghijkl.supabase.co'
-const SUPABASE_KEY = 'sb_publishable_nYB5Mluv2qy_FXXCMG6Fpw_VMP36Xmo';   // la clé « publishable » (ou « anon public »)
+const SUPABASE_URL = 'https://cdylpulhbbzjbyxyqizp.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_nYB5Mluv2qy_FXXCMG6Fpw_VMP36Xmo';
 const ONLINE = !!(SUPABASE_URL && SUPABASE_KEY);
 
 /* =====================================================================
-   1. CONSTANTES
+   1. CONSTANTES ET OBJETS DU JEU
    ===================================================================== */
-const MAX_HP   = 10;
-const MIN_GAP  = 0.9;                 // distance minimale caméra ↔ surface du cube
+const MIN_GAP  = 0.9;
 const isMobile = matchMedia('(pointer:coarse)').matches;
 const $   = id => document.getElementById(id);
 const fmt = new Intl.NumberFormat('fr-FR');
@@ -192,22 +1160,31 @@ const ARTIFACTS = {
   marteau:   { icon: '🔨', name: 'Marteau d’or', desc: 'Pendant 45 secondes, chaque coup détruit un bloc entier.', target: false },
   radar:     { icon: '📡', name: 'Radar',        desc: 'Montre pendant 90 s l’artefact caché le plus proche du centre de l’écran.', target: false },
 };
-const ART_COUNTS = { bombe: 40, foreuse: 30, marteau: 25, radar: 20, megabombe: 6 };   // pour un cube 128³
+const MATERIALS = {
+  silex:   { icon: '🪨', name: 'Silex',        desc: 'Fréquent près de la surface.' },
+  fer:     { icon: '🔩', name: 'Fer',          desc: 'Partout, surtout entre la surface et la mi-profondeur.' },
+  poudre:  { icon: '🧪', name: 'Poudre noire', desc: 'Apparaît après le premier quart de la profondeur.' },
+  cristal: { icon: '💎', name: 'Cristal',      desc: 'Seulement dans la moitié la plus profonde du cube.' },
+};
+const GOLD = { icon: '🪙', name: 'Pièce d’or' };
+const ITEM = k => ARTIFACTS[k] || MATERIALS[k] || (k === 'or' ? GOLD : { icon: '❔', name: k });
+const ALL_ITEMS = ['or', ...Object.keys(MATERIALS), ...Object.keys(ARTIFACTS)];
+const lbl = (k, q) => `${q != null ? fmt.format(q) + ' × ' : ''}${ITEM(k).icon} ${ITEM(k).name}`;
 const TREASURES = { noeud: 'Nœud doré', trophee: 'Trophée', coeur: 'Cœur de rubis', etoile: 'Étoile d’or', diamant: 'Diamant', aucun: 'Aucun objet (texte ou photo seuls)' };
+const SIZES = [30, 50, 80, 100, 128, 160, 200, 256];
 
 const settings = Object.assign({ rot: 1, zoom: 1, sound: true, fps: false },
   (() => { try { return JSON.parse(localStorage.getItem('le-cube-settings')) || {}; } catch (e) { return {}; } })());
 const saveSettings = () => { try { localStorage.setItem('le-cube-settings', JSON.stringify(settings)); } catch (e) {} };
 
-/* ---------- état global (rempli au démarrage) ---------- */
-let N, NN, TOTAL, HALF, hp, slotOf;
+/* ---------- état global ---------- */
+let N, NN, TOTAL, HALF, hp, MAX_HP = 10, cfg = {};
 let remaining = 0, coreLo = 0, coreHi = 0, coreSize = 2, coreRemaining = 0;
-let me = null, backend = null, ready = false;
+let me = null, api = null, net = null, ready = false;
 let inventory = {};
 const myStats = { hits: 0, blocks: 0 };
 const session = { best_ms: null, cps: 0, deep: 0 };
-let hammerUntil = 0, armed = null;
-let onlineNames = [];
+let hammerUntil = 0, armed = null, onlineNames = [], currentPanel = null;
 
 /* =====================================================================
    2. SCÈNE 3D
@@ -217,12 +1194,11 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, isMobile ? 1.6 : 2));
 renderer.setSize(innerWidth, innerHeight);
 document.body.prepend(renderer.domElement);
 const canvas = renderer.domElement;
-
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0d0f14);
 scene.add(new THREE.HemisphereLight(0xfff6e0, 0x3a2a18, 1.6));      // lumières du trésor uniquement
 const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(2, 4, 3); scene.add(sun);
-const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.05, 2000);
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.05, 4000);
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
 controls.dampingFactor = 0.1;
@@ -235,9 +1211,7 @@ function defaultDistance() {
   return (N * 0.95) / Math.sin(Math.min(vfov, hfov) / 2);
 }
 
-/* ---------- Shader des faces de blocs ----------
-   Couleur ET texture différentes pour chaque couche, calculées par la carte
-   graphique (aucune image à charger). 8 motifs × couleurs uniques par couche. */
+/* ---------- Shader des faces : couleur + texture différentes par couche ---------- */
 let blockMat;
 function makeBlockMaterial() {
   return new THREE.ShaderMaterial({
@@ -246,6 +1220,9 @@ function makeBlockMaterial() {
       uHover:     { value: new THREE.Vector3(-99, -99, -99) },
       uFlashCell: { value: new THREE.Vector3(-99, -99, -99) },
       uFlash:     { value: 0 },
+      uCoreLo:    { value: coreLo },
+      uCoreHi:    { value: coreHi },
+      uSealed:    { value: sealed() ? 1 : 0 },
     },
     vertexShader: /* glsl */`
       attribute float aDamage;
@@ -276,6 +1253,9 @@ function makeBlockMaterial() {
       }`,
     fragmentShader: /* glsl */`
       uniform float uHalf;
+      uniform float uCoreLo;
+      uniform float uCoreHi;
+      uniform float uSealed;
       varying vec3  vN;
       varying vec3  vW;
       varying vec2  vUv2;
@@ -285,14 +1265,11 @@ function makeBlockMaterial() {
 
       float hash13(vec3 p) { p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
       float h21(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
-      vec2 hash22(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * vec3(.1031, .1030, .0973));
-        p3 += dot(p3, p3.yzx + 33.33); return fract((p3.xx + p3.yz) * p3.zy); }
       float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
         return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), u.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), u.x), u.y); }
       float fbm(vec2 p) { return 0.6 * vnoise(p) + 0.3 * vnoise(p * 2.03 + 7.1) + 0.1 * vnoise(p * 4.1 + 3.3); }
       vec3 hsv2rgb(vec3 c) { vec3 p = abs(fract(c.xxx + vec3(0., 2./3., 1./3.)) * 6. - 3.);
         return c.z * mix(vec3(1.), clamp(p - 1., 0., 1.), c.y); }
-      // fissures : branches qui partent d'un point d'impact, plus nombreuses et longues avec les dégâts
       float crackDist(vec2 uv, vec3 sd, float dmg) {
         vec2 q = uv - (0.5 + (vec2(hash13(sd), hash13(sd + 1.7)) - 0.5) * 0.4);
         float best = 1.0;
@@ -314,54 +1291,56 @@ function makeBlockMaterial() {
       void main() {
         vec3 d3 = abs(vCell - uHalf);
         float depth = floor(uHalf - max(d3.x, max(d3.y, d3.z)) + 0.5);
-        // coordonnées continues sur la face (en blocs) : les motifs se prolongent d'un bloc à l'autre
         vec2 p = abs(vN.x) > 0.5 ? vW.zy : (abs(vN.y) > 0.5 ? vW.xz : vW.xy);
         vec3 col;
         if (depth < 0.5) {
-          // couche extérieure : marbre blanc veiné
           float v = sin(p.x * 0.9 + p.y * 0.4 + fbm(p * 0.35) * 7.0);
           col = vec3(0.93, 0.93, 0.95) * (0.9 + 0.1 * fbm(p * 2.0));
           col = mix(col, vec3(0.60, 0.65, 0.74), pow(1.0 - abs(v), 6.0) * 0.6);
         } else {
           col = hsv2rgb(vec3(fract(0.07 + depth * 0.618034), 0.5 + 0.125 * mod(depth, 3.0), 0.82 + 0.1 * mod(depth + 1.0, 2.0)));
           float id = mod(depth - 1.0, 8.0);
-          if (id < 0.5) {                       // pierre
+          if (id < 0.5) {
             col *= 0.78 + 0.35 * fbm(p * 1.7);
-          } else if (id < 1.5) {                // briques
+          } else if (id < 1.5) {
             vec2 q = p * vec2(1.0, 2.0); q.x += 0.5 * mod(floor(q.y), 2.0); vec2 f = fract(q);
             float m = step(0.06, f.x) * step(0.10, f.y);
             col *= mix(0.55, 0.92 + 0.16 * h21(floor(q)), m);
-          } else if (id < 2.5) {                // bois
+          } else if (id < 2.5) {
             float r = fract((p.x * 0.7 + fbm(p * vec2(0.4, 2.5)) * 1.6) * 2.5);
             col *= 0.75 + 0.3 * smoothstep(0.0, 0.6, r) * (1.0 - smoothstep(0.6, 1.0, r)) + 0.08 * vnoise(p * vec2(0.6, 12.0));
-          } else if (id < 3.5) {                // marbre coloré
+          } else if (id < 3.5) {
             float v = sin(p.x * 1.3 + p.y * 0.7 + fbm(p * 0.5) * 6.0);
             col = mix(col * 0.85, vec3(1.0), pow(1.0 - abs(v), 8.0) * 0.55);
-          } else if (id < 4.5) {                // carrelage
+          } else if (id < 4.5) {
             float c = mod(floor(p.x * 2.0) + floor(p.y * 2.0), 2.0);
             vec2 f = fract(p * 2.0); float j = step(0.05, f.x) * step(0.05, f.y);
             col *= mix(0.6, 0.86 + 0.18 * c, j);
-          } else if (id < 5.5) {                // picots
+          } else if (id < 5.5) {
             float d = length(fract(p * 2.0) - 0.5);
             col *= mix(1.15, 0.85, smoothstep(0.17, 0.24, d));
-          } else if (id < 6.5) {                // rayures
+          } else if (id < 6.5) {
             col *= 0.86 + 0.16 * step(0.5, fract((p.x + p.y) * 1.5));
-          } else {                              // cristal scintillant
+          } else {
             col *= 0.75 + 0.45 * h21(floor(p * 3.0));
             col += vec3(0.25) * step(0.985, h21(floor(p * 12.0)));
           }
         }
         col *= 0.95 + 0.05 * hash13(vCell);
-
-        // dégâts : assombrissement + fissures qui s'étendent
+        // cœur scellé : or gravé de runes, indestructible tant que le reste du cube existe
+        if (uSealed > 0.5 && all(greaterThan(vCell, vec3(uCoreLo - 0.5))) && all(lessThan(vCell, vec3(uCoreHi + 0.5)))) {
+          vec2 q = fract(p) - 0.5;
+          float ring = abs(length(q) - 0.3);
+          float rune = (1.0 - smoothstep(0.015, 0.03, ring)) + (1.0 - smoothstep(0.012, 0.025, abs(abs(q.x) - abs(q.y)))) * step(length(q), 0.3);
+          col = vec3(1.0, 0.78, 0.28) * (0.8 + 0.3 * fbm(p * 4.0));
+          col = mix(col, vec3(0.45, 0.25, 0.02), clamp(rune, 0.0, 1.0) * 0.8);
+        }
         col *= 1.0 - 0.6 * vDamage;
         if (vDamage > 0.001) {
           float d = crackDist(vUv2, vCell * 1.37 + vN * 7.0, vDamage);
           float w = 0.012 + 0.02 * vDamage, aa = fwidth(d) + 0.002;
           col = mix(col, col * 0.12, 1.0 - smoothstep(w - aa, w + aa, d));
         }
-
-        // liseré des blocs, estompé quand les blocs sont minuscules à l'écran (évite le moiré)
         float edge = min(min(vUv2.x, 1.0 - vUv2.x), min(vUv2.y, 1.0 - vUv2.y));
         float fw = max(fwidth(vUv2.x), fwidth(vUv2.y));
         float outline = (1.0 - smoothstep(0.0, 0.07, edge)) * (1.0 - smoothstep(0.04, 0.16, fw));
@@ -376,13 +1355,42 @@ function makeBlockMaterial() {
 }
 
 /* =====================================================================
-   3. RENDU PAR FACES VISIBLES
-   On n'affiche pas des cubes entiers mais seulement les FACES exposées,
-   rangées dans 6 InstancedMesh (une par orientation). Une face tournée
-   à l'opposé de la caméra n'est même pas envoyée à la carte graphique.
-   Pour un cube 128³ : ~98 000 faces au total, ~49 000 dessinées.
+   3. RENDU PAR FACES VISIBLES (6 InstancedMesh, une par orientation)
+   La correspondance bloc → faces est une table de hachage compacte :
+   la mémoire dépend de la surface visible, pas du volume du cube.
    ===================================================================== */
-const F = DIRS.map((d, f) => ({ f, mesh: null, dmg: null, cap: 0, used: 0, free: [], dirty: [], full: false }));
+class IntMap {
+  constructor(bits = 16) { this._alloc(bits); }
+  _alloc(bits) { this.bits = bits; this.cap = 1 << bits; this.mask = this.cap - 1; this.keys = new Int32Array(this.cap).fill(-1); this.vals = new Int32Array(this.cap); this.size = 0; }
+  _h(k) { return Math.imul(k, 0x9E3779B1) >>> (32 - this.bits); }
+  get(k) { const K = this.keys; let h = this._h(k); while (K[h] !== -1) { if (K[h] === k) return this.vals[h]; h = (h + 1) & this.mask; } return -1; }
+  set(k, v) {
+    if ((this.size + 1) * 2 > this.cap) this._grow();
+    const K = this.keys; let h = this._h(k);
+    while (K[h] !== -1 && K[h] !== k) h = (h + 1) & this.mask;
+    if (K[h] === -1) this.size++;
+    K[h] = k; this.vals[h] = v;
+  }
+  delete(k) {
+    const K = this.keys, V = this.vals, m = this.mask;
+    let i = this._h(k);
+    while (K[i] !== k) { if (K[i] === -1) return; i = (i + 1) & m; }
+    let j = i;
+    for (;;) {
+      j = (j + 1) & m;
+      if (K[j] === -1) break;
+      const h = this._h(K[j]);
+      if (j > i ? (h <= i || h > j) : (h <= i && h > j)) { K[i] = K[j]; V[i] = V[j]; i = j; }
+    }
+    K[i] = -1; this.size--;
+  }
+  _grow() { const oK = this.keys, oV = this.vals; this._alloc(this.bits + 1); for (let i = 0; i < oK.length; i++) if (oK[i] !== -1) this.set(oK[i], oV[i]); }
+}
+
+// 12 groupes : faces extérieures du cube (0-5) et faces intérieures, tunnels (6-11)
+const F = Array.from({ length: 12 }, (_, k) => ({ f: k % 6, mesh: null, dmg: null, cap: 0, used: 0, free: [], dirty: [], full: false }));
+const setOf = (i, f) => F[f + (neighbor(i, f) < 0 ? 0 : 6)];
+const recMap = new IntMap(16);
 let recFace = new Int32Array(0), recCap = 0, recUsed = 0, recFree = [];
 
 function faceGeometry(f) {
@@ -398,7 +1406,7 @@ function faceGeometry(f) {
 }
 function growFaces(S, need) {
   let cap = Math.max(2048, S.cap);
-  while (cap < need) cap *= 2;
+  while (cap < need) cap = Math.ceil(cap * 1.5);    // croissance par paliers de 50 % (moins de mémoire perdue)
   const geo = faceGeometry(S.f);
   const dmg = new THREE.InstancedBufferAttribute(new Float32Array(cap), 1);
   dmg.setUsage(THREE.DynamicDrawUsage);
@@ -427,14 +1435,15 @@ function newRecord(i) {
     r = recUsed++;
   }
   recFace.fill(-1, r * 6, r * 6 + 6);
-  slotOf[i] = r;
+  recMap.set(i, r);
   return r;
 }
+const dmgOf = i => Math.min(1, Math.max(0, (MAX_HP - hp[i]) / MAX_HP));
 function addFace(i, f) {
-  let r = slotOf[i];
+  let r = recMap.get(i);
   if (r < 0) r = newRecord(i);
   if (recFace[r * 6 + f] >= 0) return;
-  const S = F[f];
+  const S = setOf(i, f);
   let s;
   if (S.free.length) s = S.free.pop();
   else { if (S.used >= S.cap) growFaces(S, S.used + 1); s = S.used++; S.mesh.count = S.used; }
@@ -445,27 +1454,27 @@ function addFace(i, f) {
   a[o + 4] = 0; a[o + 5] = 1; a[o + 6] = 0; a[o + 7] = 0;
   a[o + 8] = 0; a[o + 9] = 0; a[o + 10] = 1; a[o + 11] = 0;
   a[o + 12] = x - HALF; a[o + 13] = y - HALF; a[o + 14] = z - HALF; a[o + 15] = 1;
-  S.dmg.array[s] = (MAX_HP - hp[i]) / MAX_HP;
+  S.dmg.array[s] = dmgOf(i);
   S.dirty.push(s);
 }
 function removeFace(i, f) {
-  const r = slotOf[i];
+  const r = recMap.get(i);
   if (r < 0) return;
   const s = recFace[r * 6 + f];
   if (s < 0) return;
-  const S = F[f];
-  S.mesh.instanceMatrix.array.fill(0, s * 16, s * 16 + 16);   // matrice nulle = invisible
+  const S = setOf(i, f);
+  S.mesh.instanceMatrix.array.fill(0, s * 16, s * 16 + 16);
   S.free.push(s); S.dirty.push(s);
   recFace[r * 6 + f] = -1;
   for (let k = 0; k < 6; k++) if (recFace[r * 6 + k] >= 0) return;
-  recFree.push(r); slotOf[i] = -1;
+  recFree.push(r); recMap.delete(i);
 }
 function setDamage(i) {
-  const r = slotOf[i];
+  const r = recMap.get(i);
   if (r < 0) return;
   for (let f = 0; f < 6; f++) {
     const s = recFace[r * 6 + f];
-    if (s >= 0) { F[f].dmg.array[s] = (MAX_HP - hp[i]) / MAX_HP; F[f].dirty.push(s); }
+    if (s >= 0) { const S = setOf(i, f); S.dmg.array[s] = dmgOf(i); S.dirty.push(s); }
   }
 }
 function neighbor(i, f) {
@@ -480,10 +1489,12 @@ function neighbor(i, f) {
   }
 }
 function buildAllFaces() {
-  for (const S of F) growFaces(S, Math.ceil(N * N * 1.3));
+  F.forEach((S, k) => growFaces(S, k < 6 ? N * N + 64 : 2048));
   let i = 0;
   for (let z = 0; z < N; z++) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++, i++) {
     if (hp[i] === 0) continue;
+    if (x !== 0 && x !== N - 1 && y !== 0 && y !== N - 1 && z !== 0 && z !== N - 1 &&
+        hp[i + 1] && hp[i - 1] && hp[i + N] && hp[i - N] && hp[i + NN] && hp[i - NN]) continue;
     if (x === N - 1 || hp[i + 1] === 0) addFace(i, 0);
     if (x === 0 || hp[i - 1] === 0) addFace(i, 1);
     if (y === N - 1 || hp[i + N] === 0) addFace(i, 2);
@@ -505,17 +1516,20 @@ function flushFaces() {
     S.dirty.length = 0; S.full = false;
   }
 }
-// Une face +x n'est visible que si la caméra est du côté +x de son plan, etc.
+// Une face n'est visible que si la caméra est du bon côté de son plan.
+// Faces extérieures : test exact. Faces des tunnels : test large.
 function cullFaces() {
-  const c = camera.position, lim = HALF - 0.5 + 1e-3, show = !treasureView;
-  F[0].mesh.visible = show && c.x > -lim; F[1].mesh.visible = show && c.x < lim;
-  F[2].mesh.visible = show && c.y > -lim; F[3].mesh.visible = show && c.y < lim;
-  F[4].mesh.visible = show && c.z > -lim; F[5].mesh.visible = show && c.z < lim;
+  const c = camera.position, e = N / 2 - 1e-3, lim = HALF - 0.5 + 1e-3, show = !treasureView;
+  F[0].mesh.visible = show && c.x > e;    F[1].mesh.visible = show && c.x < -e;
+  F[2].mesh.visible = show && c.y > e;    F[3].mesh.visible = show && c.y < -e;
+  F[4].mesh.visible = show && c.z > e;    F[5].mesh.visible = show && c.z < -e;
+  F[6].mesh.visible = show && c.x > -lim; F[7].mesh.visible = show && c.x < lim;
+  F[8].mesh.visible = show && c.y > -lim; F[9].mesh.visible = show && c.y < lim;
+  F[10].mesh.visible = show && c.z > -lim; F[11].mesh.visible = show && c.z < lim;
 }
-const cubeHidden = () => treasureView;
 
 /* =====================================================================
-   4. PARTICULES
+   4. PARTICULES ET BALISE RADAR
    ===================================================================== */
 const PMAX = 500;
 const parts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), new THREE.MeshBasicMaterial(), PMAX);
@@ -531,16 +1545,16 @@ function hsv(h, s, v) {
 }
 function depthOf(i) {
   const x = i % N, y = ((i / N) | 0) % N, z = (i / NN) | 0;
-  return Math.floor(HALF - Math.max(Math.abs(x - HALF), Math.abs(y - HALF), Math.abs(z - HALF)) + 0.5);
+  return Math.min(x, N - 1 - x, y, N - 1 - y, z, N - 1 - z);
 }
 function layerRGB(depth) {
   if (depth === 0) return [0.7, 0.7, 0.72];
   const [r, g, b] = hsv(((0.07 + depth * 0.618034) % 1), 0.5 + 0.125 * (depth % 3), 0.82 + 0.1 * ((depth + 1) % 2));
   return [r * 0.8, g * 0.8, b * 0.8];
 }
-function spawnParticles(i, count = 8) {
+function spawnParticles(i, count = 8, gold = false) {
   const x = i % N - HALF, y = ((i / N) | 0) % N - HALF, z = ((i / NN) | 0) - HALF;
-  const [r, g, b] = layerRGB(depthOf(i));
+  const [r, g, b] = gold ? [1, 0.8, 0.2] : layerRGB(depthOf(i));
   for (let k = 0; k < count && pList.length < PMAX; k++) {
     pList.push({ x: x + (Math.random() - 0.5) * 0.6, y: y + (Math.random() - 0.5) * 0.6, z: z + (Math.random() - 0.5) * 0.6,
       vx: (Math.random() - 0.5) * 6, vy: Math.random() * 5 + 1, vz: (Math.random() - 0.5) * 6,
@@ -567,8 +1581,6 @@ function updateParticles(dt) {
   pList.length = n; parts.count = n;
   parts.instanceMatrix.needsUpdate = true; parts.instanceColor.needsUpdate = true;
 }
-
-/* ---------- Balise du radar ---------- */
 let beacon = null, beaconUntil = 0;
 function showBeacon(i) {
   if (!beacon) {
@@ -596,7 +1608,6 @@ function getEnv() {
 }
 const goldMat = () => new THREE.MeshStandardMaterial({ color: 0xffcf4a, metalness: 0.88, roughness: 0.26, envMap: getEnv(), envMapIntensity: 1.6, emissive: 0x4a3000 });
 const gemMat = () => new THREE.MeshStandardMaterial({ color: 0xfff4c4, metalness: 0.2, roughness: 0.05, envMap: getEnv(), emissive: 0x5a3c00 });
-
 function centerObject(g) {
   const c = new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3());
   g.children.forEach(ch => ch.position.sub(c));
@@ -698,15 +1709,15 @@ async function makePhoto(url) {
   }
   return g;
 }
-async function buildTreasure(cfg) {
+async function buildTreasure(c) {
   const root = new THREE.Group(), items = [], sway = [];
   let spin = null;
-  if (cfg.image) {
-    try { const p = await makePhoto(await backend.imageUrl(cfg.image)); items.push(p); sway.push(p); }
+  if (c.image) {
+    try { const p = await makePhoto(await net.imageUrl(c.image)); items.push(p); sway.push(p); }
     catch (e) { console.warn('photo du trésor', e); }
   }
-  if (cfg.kind && cfg.kind !== 'aucun') { spin = makeShape(cfg.kind); items.push(spin); }
-  const msg = (cfg.message || '').trim();
+  if (c.kind && c.kind !== 'aucun') { spin = makeShape(c.kind); items.push(spin); }
+  const msg = (c.message || '').trim();
   if (msg) { const pl = makePlaque(msg); items.push(pl); sway.push(pl); }
   if (!items.length) { spin = makeShape('noeud'); items.push(spin); }
   const boxes = items.map(o => new THREE.Box3().setFromObject(o));
@@ -732,9 +1743,9 @@ function disposeTreasure() {
   });
   treasureObj = null;
 }
-async function showTreasure(cfg) {
+async function showTreasure(c) {
   disposeTreasure();
-  treasureObj = await buildTreasure(cfg);
+  treasureObj = await buildTreasure(c);
   scene.add(treasureObj.root);
   requestRender();
 }
@@ -755,10 +1766,10 @@ async function onCoreDone(withBanner) {
   if (treasureRevealed) return;
   for (let k = 0; k < 6; k++) {
     try {
-      const cfg = await backend.getTreasure();
-      if (cfg) {
+      const c = await api.getTreasure();
+      if (c) {
         treasureRevealed = true; previewMode = false;
-        await showTreasure(cfg);
+        await showTreasure(c);
         $('bTreasure').classList.remove('hidden');
         if (withBanner) { $('banner').classList.add('open'); sfx('treasure'); }
         return;
@@ -769,8 +1780,10 @@ async function onCoreDone(withBanner) {
 }
 
 /* =====================================================================
-   6. LOGIQUE DES BLOCS (même fonction pour mes coups, ceux des amis et les artefacts)
+   6. LOGIQUE DES BLOCS
    ===================================================================== */
+const sealed = () => remaining - coreRemaining > 0;   // il reste des blocs hors du cœur
+let sealNotice = 0;
 const isCore = i => {
   const x = i % N, y = ((i / N) | 0) % N, z = (i / NN) | 0;
   return x >= coreLo && x <= coreHi && y >= coreLo && y <= coreHi && z >= coreLo && z <= coreHi;
@@ -781,6 +1794,11 @@ function setHp(i, v, origin) {
   hp[i] = v;
   if (v === 0) {
     remaining--;
+    if (blockMat && blockMat.uniforms.uSealed.value === 1 && !sealed()) {
+      blockMat.uniforms.uSealed.value = 0;
+      toast('🔓 Le cœur du cube est descellé : cassez-le pour découvrir le trésor !', true);
+      sfx('treasure');
+    }
     for (let f = 0; f < 6; f++) removeFace(i, f);
     for (let f = 0; f < 6; f++) { const j = neighbor(i, f); if (j >= 0 && hp[j] > 0) addFace(j, f ^ 1); }
     spawnParticles(i, origin === 'art' ? 2 : 8);
@@ -788,7 +1806,6 @@ function setHp(i, v, origin) {
   } else setDamage(i);
   hudDirty = true;
   requestRender();
-  backend?.changed?.();
   return true;
 }
 
@@ -798,6 +1815,16 @@ const hitTimes = [];
 function playerHit(i) {
   if (!ready || hp[i] === 0) return;
   const now = performance.now();
+  if (isCore(i) && sealed()) {
+    if (now - sealNotice > 4000) {
+      sealNotice = now;
+      const left = remaining - coreRemaining;
+      toast(`🔒 Le cœur est scellé : il faut d’abord détruire ${left > 1 ? `les ${fmt.format(left)} autres blocs` : 'le dernier autre bloc'} du cube`, true);
+    }
+    blockMat.uniforms.uFlashCell.value.set(i % N, ((i / N) | 0) % N, (i / NN) | 0);
+    flash = 0.5; sfx('hit');
+    return;
+  }
   const dmg = now < hammerUntil ? MAX_HP : 1;
   myStats.hits += dmg;
   hitTimes.push(now);
@@ -810,7 +1837,7 @@ function playerHit(i) {
   setHp(i, nv, 'me');
   if (nv === 0) {
     myStats.blocks++;
-    if (!rec.hammer && rec.n >= MAX_HP) {
+    if (!rec.hammer && rec.n >= MAX_HP && MAX_HP > 1) {
       const ms = Math.round(now - rec.t);
       if (session.best_ms == null || ms < session.best_ms) session.best_ms = ms;
     }
@@ -824,7 +1851,7 @@ function playerHit(i) {
   queueHit(i, dmg);
 }
 
-/* ---------- envoi groupé des coups (au plus 1 message par seconde et par joueur) ---------- */
+/* ---------- envoi groupé (au plus 1 message par seconde) ---------- */
 const pending = new Map();
 let flushTimer = null;
 function queueHit(i, n) {
@@ -836,25 +1863,49 @@ async function flushHits() {
   if (!pending.size) return;
   const list = [...pending]; pending.clear();
   try {
-    const res = await backend.hit(list, { best_ms: session.best_ms, cps: session.cps, deep: session.deep });
-    const flat = [];
-    for (const [i, v, art] of res || []) {
+    const res = await api.hit(list, { best_ms: session.best_ms, cps: session.cps, deep: session.deep });
+    const flat = [], loots = [];
+    for (const [i, v, art, loot] of res.r || []) {
       setHp(i, v, 'net');
       flat.push(i, v);
       if (art) gotArtifact(art);
+      if (loot && loot !== 'scelle') { loots.push(loot); spawnParticles(i, 6, loot.startsWith('or')); }
     }
-    if (flat.length) backend.send('hits', { r: flat });
+    if (flat.length) net.send('hits', { r: flat });
+    gotLoot(loots);
+    gotMessages(res.msgs);
   } catch (e) {
     toast('⚠️ Coups non enregistrés : ' + e.message);
   }
 }
+function addInv(k, q) { inventory[k] = Math.max(0, (inventory[k] || 0) + q); hudDirty = true; }
 function gotArtifact(kind) {
   const A = ARTIFACTS[kind]; if (!A) return;
-  inventory[kind] = (inventory[kind] || 0) + 1;
+  addInv(kind, 1);
   renderInvBar();
   toast(`🎉 Tu as trouvé : ${A.icon} ${A.name} !`, true);
   sfx('treasure');
-  backend.send('feed', { text: `🎉 ${me.pseudo} a trouvé ${A.icon} ${A.name} !` });
+  net.send('feed', { text: `🎉 ${me.pseudo} a trouvé ${A.icon} ${A.name} !` });
+}
+function gotLoot(loots) {
+  if (!loots.length) return;
+  const sum = {};
+  for (const l of loots) { const [k, q] = l.split(':'); sum[k] = (sum[k] || 0) + (+q || 1); }
+  for (const [k, q] of Object.entries(sum)) addInv(k, q);
+  const parts = Object.entries(sum).map(([k, q]) => `${ITEM(k).icon} +${q}`);
+  const jackpot = loots.some(l => l === 'or:20');
+  toast(`${jackpot ? '💰 Bourse ! ' : ''}${parts.join(' · ')}`, jackpot);
+  if (jackpot) { sfx('treasure'); net.send('feed', { text: `💰 ${me.pseudo} a trouvé une bourse de 20 pièces d’or !` }); }
+  else sfx('coin');
+  refreshPanel('missions');
+}
+function gotMessages(msgs) {
+  if (!msgs || !msgs.length) return;
+  for (const m of msgs) toast(m, true);
+  sfx('treasure');
+  api.inventory().then(inv => { inventory = inv; renderInvBar(); hudDirty = true; });
+  net.send('feed', { text: `📜 ${me.pseudo} a accompli une mission` });
+  refreshPanel('missions');
 }
 
 /* ---------- artefacts ---------- */
@@ -881,12 +1932,13 @@ async function useArtifact(kind, target) {
     if (center < 0) center = Math.floor(HALF) * (1 + N + NN);
   }
   try {
-    const res = await backend.use(kind, center, kind === 'foreuse' ? viewDir() : 0);
-    inventory[kind]--; renderInvBar();
+    const res = await api.use(kind, center, kind === 'foreuse' ? viewDir() : 0);
+    addInv(kind, -1); renderInvBar();
     const list = res.destroyed || [];
     for (const i of list) { setHp(i, 0, 'art'); session.deep = Math.max(session.deep, depthOf(i)); }
     myStats.blocks += list.length;
     for (const f of res.found || []) gotArtifact(f.kind);
+    gotLoot(res.loot || []);
     if (kind === 'marteau') hammerUntil = performance.now() + 45000;
     if (kind === 'radar') {
       if (res.radar >= 0) {
@@ -894,21 +1946,22 @@ async function useArtifact(kind, target) {
         toast(`📡 Un artefact se cache en couche ${depthOf(res.radar) + 1} (balise dorée pendant 90 s)`, true);
       } else toast('📡 Plus aucun artefact caché !', true);
     }
-    if (list.length) { sfx('boom'); navigator.vibrate?.([20, 40, 30]); backend.send('hits', { r: list.flatMap(i => [i, 0]) }); }
+    if (list.length) { sfx('boom'); navigator.vibrate?.([20, 40, 30]); net.send('hits', { r: list.flatMap(i => [i, 0]) }); }
     const extra = list.length ? ` : ${fmt.format(list.length)} blocs pulvérisés` : '';
     toast(`${A.icon} ${A.name}${extra || ' activé'}`, true);
-    backend.send('feed', { text: `${A.icon} ${me.pseudo} a utilisé : ${A.name}${extra}` });
+    net.send('feed', { text: `${A.icon} ${me.pseudo} a utilisé : ${A.name}${extra}` });
+    gotMessages(res.msgs);
     hudDirty = true;
   } catch (e) { toast('⚠️ ' + e.message); }
 }
 
 /* =====================================================================
-   7. VISÉE (parcours de la grille case par case, instantané)
+   7. VISÉE, CAMÉRA, ENTRÉES, SON
    ===================================================================== */
 const _rc = new THREE.Raycaster(), _ndc = new THREE.Vector2();
 let ddaT = 0;
 function pickBlock(cx, cy) {
-  if (cubeHidden()) return -1;
+  if (treasureView) return -1;
   const r = canvas.getBoundingClientRect();
   _ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
   _rc.setFromCamera(_ndc, camera);
@@ -950,7 +2003,6 @@ function dda(ox, oy, oz, dx, dy, dz) {
   }
   return -1;
 }
-// Distance du centre à la première surface pleine dans la direction de la caméra
 function surfaceDistance() {
   const len = camera.position.length();
   if (len < 1e-6) return 0;
@@ -959,16 +2011,11 @@ function surfaceDistance() {
   const i = dda(ux * R + G, uy * R + G, uz * R + G, -ux, -uy, -uz);
   return i < 0 ? 0 : R - ddaT;
 }
-
-/* =====================================================================
-   8. CAMÉRA : impossible d'entrer dans la matière + sensibilité adaptée
-   ===================================================================== */
 function clampCamera() {
   if (treasureView) { controls.rotateSpeed = (isMobile ? 0.55 : 0.8) * settings.rot; return false; }
   const surf = surfaceDistance(), len = camera.position.length();
   let changed = false;
   if (len < surf + MIN_GAP) { camera.position.setLength(surf + MIN_GAP); changed = true; }
-  // plus on est près de la surface, plus la rotation est douce
   const gap = Math.max(0, camera.position.length() - surf);
   const k = Math.min(1, Math.max(0.05, gap / (N * 0.45)));
   controls.rotateSpeed = (isMobile ? 0.55 : 0.8) * settings.rot * k;
@@ -984,14 +2031,10 @@ function zoomBy(factor) {
   requestRender();
 }
 
-/* =====================================================================
-   9. ENTRÉES
-   ===================================================================== */
 const ptrs = new Map();
 let down = null, multi = false, pinchD = 0;
 let hoverX = 0, hoverY = 0, hoverPending = false, hoverIdx = -1;
 const pinchDist = () => { const [a, b] = [...ptrs.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
-
 canvas.addEventListener('pointerdown', e => {
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (ptrs.size === 1) { down = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId }; multi = false; }
@@ -1029,7 +2072,6 @@ canvas.addEventListener('wheel', e => {
   zoomBy(Math.exp(Math.max(-200, Math.min(200, dy)) * 0.0012 * settings.zoom));
 }, { passive: false });
 
-/* ---------- Son (synthétisé) ---------- */
 let actx = null, noiseBuf = null;
 function unlockAudio() {
   if (actx || !settings.sound) return;
@@ -1040,37 +2082,38 @@ function unlockAudio() {
     for (let k = 0; k < ch.length; k++) ch[k] = Math.random() * 2 - 1;
   } catch (e) {}
 }
+function tone(f, t0, dur, vol, type = 'sine') {
+  const o = actx.createOscillator(), g = actx.createGain(); o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(vol, t0 + 0.015); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  o.connect(g); g.connect(actx.destination); o.start(t0); o.stop(t0 + dur + 0.05);
+}
 function sfx(type) {
   if (!settings.sound) return;
   unlockAudio();
   if (!actx) return;
   try {
-    const t = actx.currentTime, g = actx.createGain();
-    g.connect(actx.destination);
+    const t = actx.currentTime;
     if (type === 'hit') {
-      const o = actx.createOscillator(); o.type = 'triangle';
+      const o = actx.createOscillator(), g = actx.createGain(); o.type = 'triangle';
       o.frequency.setValueAtTime(220 + Math.random() * 40, t); o.frequency.exponentialRampToValueAtTime(70, t + 0.07);
       g.gain.setValueAtTime(0.16, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
-      o.connect(g); o.start(t); o.stop(t + 0.09);
+      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + 0.09);
+    } else if (type === 'coin') {
+      tone(1318, t, 0.12, 0.12, 'square'); tone(1760, t + 0.07, 0.25, 0.1, 'square');
     } else if (type === 'treasure') {
-      [523, 659, 784, 1047].forEach((f, k) => {
-        const o = actx.createOscillator(), gg = actx.createGain(); o.type = 'sine'; o.frequency.value = f;
-        gg.gain.setValueAtTime(0, t + k * 0.09); gg.gain.linearRampToValueAtTime(0.15, t + k * 0.09 + 0.02);
-        gg.gain.exponentialRampToValueAtTime(0.001, t + k * 0.09 + 0.5);
-        o.connect(gg); gg.connect(actx.destination); o.start(t + k * 0.09); o.stop(t + k * 0.09 + 0.55);
-      });
+      [523, 659, 784, 1047].forEach((f, k) => tone(f, t + k * 0.09, 0.5, 0.15));
     } else {
-      const big = type === 'boom';
+      const big = type === 'boom', g = actx.createGain();
       const s = actx.createBufferSource(), f = actx.createBiquadFilter();
       s.buffer = noiseBuf; f.type = 'lowpass'; f.frequency.value = big ? 420 : 1100;
       g.gain.setValueAtTime(big ? 0.6 : 0.33, t); g.gain.exponentialRampToValueAtTime(0.001, t + (big ? 0.55 : 0.18));
-      s.connect(f); f.connect(g); s.start(t);
+      s.connect(f); f.connect(g); g.connect(actx.destination); s.start(t);
     }
   } catch (e) {}
 }
 
 /* =====================================================================
-   10. INTERFACE
+   8. INTERFACE COMMUNE
    ===================================================================== */
 function toast(text, big = false) {
   const el = document.createElement('div');
@@ -1079,18 +2122,18 @@ function toast(text, big = false) {
   const feed = $('feed');
   feed.prepend(el);
   while (feed.children.length > 4) feed.lastChild.remove();
-  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 700); }, big ? 6000 : 4000);
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 700); }, big ? 6000 : 3500);
 }
 const pct = x => (x * 100).toFixed(x < 0.01 ? 3 : 2).replace('.', ',') + ' %';
 function updateHUD() {
   const done = TOTAL - remaining;
   $('count').textContent = `Blocs restants : ${fmt.format(remaining)} / ${fmt.format(TOTAL)}`;
   $('barFill').style.width = (done / TOTAL * 100) + '%';
-  let sub = `${pct(done / TOTAL)} détruit · Toi : ${fmt.format(myStats.hits)} coups · ${fmt.format(myStats.blocks)} blocs`;
+  let sub = `${pct(done / TOTAL)} détruit · Toi : ${fmt.format(myStats.hits)} coups · ${fmt.format(myStats.blocks)} blocs · 🪙 ${fmt.format(inventory.or || 0)}`;
   const hl = hammerUntil - performance.now();
   if (hl > 0) sub += ` · 🔨 ${Math.ceil(hl / 1000)} s`;
   $('sub').textContent = sub;
-  $('online').textContent = backend?.online ? `👥 En ligne : ${onlineNames.length ? onlineNames.join(', ') : '…'}` : '';
+  $('online').textContent = ONLINE ? `👥 En ligne : ${onlineNames.length ? onlineNames.join(', ') : '…'}` : '';
   hudDirty = false;
 }
 let helpHidden = false;
@@ -1113,185 +2156,363 @@ function renderInvBar() {
     bar.appendChild(b);
   }
 }
-
-function openModal(title, html) {
+function openModal(title, html, panel = null) {
+  currentPanel = panel;
   $('mTitle').textContent = title;
   $('mBody').innerHTML = html;
   $('modal').classList.add('open');
 }
-const closeModal = () => $('modal').classList.remove('open');
+const closeModal = () => { $('modal').classList.remove('open'); currentPanel = null; };
 $('mClose').onclick = closeModal;
 $('modal').addEventListener('click', e => { if (e.target === $('modal')) closeModal(); });
 $('bDisarm').onclick = disarm;
+const panelRefreshers = {};
+function refreshPanel(name) { if (currentPanel && currentPanel.startsWith(name)) panelRefreshers[name]?.(currentPanel); }
+async function act(fn, okMsg) {
+  try {
+    const r = await fn();
+    if (okMsg) toast(typeof okMsg === 'function' ? okMsg(r) : okMsg, true);
+    return (r === null || r === undefined || r === '') ? true : r;
+  }
+  catch (e) { toast('⚠️ ' + e.message); return null; }
+}
+async function reloadInventory() { inventory = await api.inventory(); renderInvBar(); hudDirty = true; }
+const tabsHtml = (tabs, cur) => `<div class="tabs">${tabs.map(([k, t]) => `<button data-tab="${k}" class="${k === cur ? 'on' : ''}">${t}</button>`).join('')}</div>`;
+const bindTabs = fn => $('mBody').querySelectorAll('[data-tab]').forEach(b => b.onclick = () => fn(b.dataset.tab));
+let playersCache = null;
+async function otherPlayers() {
+  if (!ONLINE) return [];
+  try { playersCache = await api.leaderboard(); } catch (e) {}
+  return (playersCache || []).filter(r => r.id !== me.id);
+}
+const itemOptions = (keys, sel) => keys.map(k => `<option value="${k}" ${k === sel ? 'selected' : ''}>${ITEM(k).icon} ${ITEM(k).name}</option>`).join('');
 
-/* ---------- Classement ---------- */
+/* =====================================================================
+   9. PANNEAUX
+   ===================================================================== */
+/* ---------- 🏆 Classement ---------- */
 const fmtMs = ms => (ms / 1000).toFixed(1).replace('.', ',') + ' s';
 async function openBoard() {
-  openModal('🏆 Classement', '<p class="muted">Chargement…</p>');
+  openModal('🏆 Classement', '<p class="muted">Chargement…</p>', 'board');
   let rows;
-  try { rows = await backend.leaderboard(); } catch (e) { $('mBody').innerHTML = `<p>⚠️ ${esc(e.message)}</p>`; return; }
+  try { rows = await api.leaderboard(); } catch (e) { $('mBody').innerHTML = `<p>⚠️ ${esc(e.message)}</p>`; return; }
   const best = (key, cmp, ok = r => r[key] > 0) => {
     const c = rows.filter(ok);
     return c.length ? c.reduce((a, b) => (cmp(b[key], a[key]) ? b : a)) : null;
   };
+  const gt = (a, b) => a > b;
   const recs = [
-    ['🧱 Plus gros casseur', best('blocks', (a, b) => a > b), r => `${r.pseudo} · ${fmt.format(r.blocks)} blocs`],
-    ['👊 Plus de coups', best('hits', (a, b) => a > b), r => `${r.pseudo} · ${fmt.format(r.hits)} coups`],
+    ['🧱 Plus gros casseur', best('blocks', gt), r => `${r.pseudo} · ${fmt.format(r.blocks)} blocs`],
+    ['👊 Plus de coups', best('hits', gt), r => `${r.pseudo} · ${fmt.format(r.hits)} coups`],
     ['⏱️ Bloc détruit le plus vite', best('best_break_ms', (a, b) => a < b, r => r.best_break_ms != null), r => `${r.pseudo} · ${fmtMs(r.best_break_ms)}`],
-    ['⚡ Frappe la plus rapide', best('best_cps', (a, b) => a > b), r => `${r.pseudo} · ${r.best_cps} coups / 10 s`],
-    ['⛏️ Le plus profond', best('deepest', (a, b) => a > b, r => r.blocks > 0), r => `${r.pseudo} · couche ${r.deepest + 1}`],
-    ['🎁 Chasseur d’artefacts', best('artifacts_found', (a, b) => a > b), r => `${r.pseudo} · ${r.artifacts_found}`],
-    ['💥 Artificier', best('artifacts_used', (a, b) => a > b), r => `${r.pseudo} · ${r.artifacts_used} utilisés`],
+    ['⚡ Frappe la plus rapide', best('best_cps', gt), r => `${r.pseudo} · ${r.best_cps} coups / 10 s`],
+    ['⛏️ Le plus profond', best('deepest', gt, r => r.blocks > 0), r => `${r.pseudo} · couche ${r.deepest + 1}`],
+    ['💰 Le plus riche', best('gold', gt), r => `${r.pseudo} · ${fmt.format(r.gold)} 🪙`],
+    ['🎁 Chasseur d’artefacts', best('artifacts_found', gt), r => `${r.pseudo} · ${r.artifacts_found}`],
+    ['💥 Artificier', best('artifacts_used', gt), r => `${r.pseudo} · ${r.artifacts_used} utilisés`],
+    ['🛠️ Artisan', best('crafted', gt), r => `${r.pseudo} · ${r.crafted} fabriqués`],
+    ['🤝 Marchand', best('trades', gt), r => `${r.pseudo} · ${r.trades} échanges`],
+    ['📜 Missionnaire', best('missions_done', gt), r => `${r.pseudo} · ${r.missions_done} missions`],
+    ['⛏️ Prospecteur', best('materials_found', gt), r => `${r.pseudo} · ${r.materials_found} matériaux`],
   ];
   const medals = ['🥇', '🥈', '🥉'];
   const done = TOTAL - remaining;
   $('mBody').innerHTML = `
-    <p class="muted">Cube ${N}×${N}×${N} · ${pct(done / TOTAL)} détruit · ${fmt.format(done)} blocs sur ${fmt.format(TOTAL)}</p>
+    <p class="muted">Cube ${N}×${N}×${N} · ${MAX_HP} coup${MAX_HP > 1 ? 's' : ''} par bloc · ${pct(done / TOTAL)} détruit (${fmt.format(done)} / ${fmt.format(TOTAL)})</p>
     <div class="records">${recs.map(([t, r, f]) => `<div class="rec">${t}<b>${r ? esc(f(r)) : '—'}</b></div>`).join('')}</div>
     <div class="sec"><h3>Joueurs</h3>
     ${rows.map((r, k) => `<div class="pl">
       <div><span class="nm">${medals[k] || (k + 1) + '.'} ${esc(r.pseudo)}</span>${onlineNames.includes(r.pseudo) ? '<span class="dot" title="en ligne"></span>' : ''}</div>
-      <div class="muted" style="opacity:.8">🧱 ${fmt.format(r.blocks)} blocs · 👊 ${fmt.format(r.hits)} coups · ⚡ ${r.best_cps}/10 s
-      · ⏱️ ${r.best_break_ms != null ? fmtMs(r.best_break_ms) : '—'} · ⛏️ couche ${r.deepest + 1} · 🎁 ${r.artifacts_found} trouvés / ${r.artifacts_used} utilisés</div>
+      <div class="muted" style="opacity:.85">🧱 ${fmt.format(r.blocks)} blocs · 👊 ${fmt.format(r.hits)} coups · 🪙 ${fmt.format(r.gold)}
+      · ⚡ ${r.best_cps}/10 s · ⏱️ ${r.best_break_ms != null ? fmtMs(r.best_break_ms) : '—'} · ⛏️ couche ${r.deepest + 1}
+      · 🎁 ${r.artifacts_found} trouvés / ${r.artifacts_used} utilisés · 🛠️ ${r.crafted} · 🤝 ${r.trades} · 📜 ${r.missions_done}</div>
     </div>`).join('')}</div>`;
 }
 
-/* ---------- Inventaire ---------- */
-async function openInventory() {
-  let players = [];
-  if (backend.online) { try { players = (await backend.leaderboard()).filter(r => r.id !== me.id); } catch (e) {} }
-  const opts = players.map(p => `<option value="${esc(p.id)}">${esc(p.pseudo)}</option>`).join('');
-  openModal('🎒 Mes artefacts', `
-    <p class="muted">Les artefacts sont cachés dans le cube, aux mêmes endroits pour tout le monde
-    (environ 1 bloc sur 17 000). Celui qui casse le bloc le gagne.</p>
-    ${Object.entries(ARTIFACTS).map(([k, A]) => {
-      const q = inventory[k] || 0;
-      return `<div class="item" style="${q ? '' : 'opacity:.45'}">
-        <div class="ic">${A.icon}</div>
-        <div class="tx"><b>${A.name} × ${q}</b><span class="muted">${A.desc}</span>
-          ${q ? `<div class="btns"><button class="primary" data-use="${k}">Utiliser</button>
-            ${backend.online && players.length ? `<select data-to="${k}" style="width:auto;flex:1">${opts}</select><button data-give="${k}">🎁 Donner</button>` : ''}</div>` : ''}
-        </div></div>`;
-    }).join('')}`);
-  $('mBody').querySelectorAll('[data-use]').forEach(b => b.onclick = () => {
-    const k = b.dataset.use; closeModal();
-    if (ARTIFACTS[k].target) arm(k); else useArtifact(k, null);
+/* ---------- 🎒 Sac et atelier ---------- */
+async function openBag(tab = 'sac') {
+  openModal('🎒 Mon sac', '<p class="muted">Chargement…</p>', 'bag:' + tab);
+  await reloadInventory().catch(() => {});
+  const body = tabsHtml([['sac', '🎒 Sac'], ['atelier', '🛠️ Atelier']], tab);
+  if (tab === 'atelier') {
+    const recipes = cfg.recipes || {};
+    $('mBody').innerHTML = body + `<p class="muted">Assemble des matériaux trouvés en creusant pour fabriquer des artefacts.
+      Les matériaux dépendent de la profondeur : plus tu creuses, plus ils sont précieux.</p>` +
+      Object.entries(recipes).map(([k, ing]) => {
+        const okAll = Object.entries(ing).every(([m, q]) => (inventory[m] || 0) >= q);
+        return `<div class="item"><div class="ic">${ITEM(k).icon}</div><div class="tx"><b>${ITEM(k).name}</b>
+          <span style="font-size:13px">${Object.entries(ing).map(([m, q]) => `<span class="${(inventory[m] || 0) >= q ? 'ok' : 'bad'}">${ITEM(m).icon} ${inventory[m] || 0}/${q}</span>`).join(' · ')}</span></div>
+          <button class="primary small" data-craft="${k}" ${okAll ? '' : 'disabled'}>Fabriquer</button></div>`;
+      }).join('');
+    $('mBody').querySelectorAll('[data-craft]').forEach(b => b.onclick = async () => {
+      const k = b.dataset.craft;
+      if (await act(() => api.craft(k), `🛠️ Fabriqué : ${lbl(k)}`)) {
+        sfx('coin');
+        net.send('feed', { text: `🛠️ ${me.pseudo} a fabriqué ${lbl(k)}` });
+        openBag('atelier');
+      }
+    });
+  } else {
+    const players = await otherPlayers();
+    const owned = ALL_ITEMS.filter(k => (inventory[k] || 0) > 0);
+    $('mBody').innerHTML = body + `
+      <div class="goldline">🪙 ${fmt.format(inventory.or || 0)} pièce${(inventory.or || 0) > 1 ? 's' : ''} d’or</div>
+      <h3>Artefacts</h3>
+      ${Object.entries(ARTIFACTS).map(([k, A]) => {
+        const q = inventory[k] || 0;
+        return `<div class="item" style="${q ? '' : 'opacity:.45'}"><div class="ic">${A.icon}</div>
+          <div class="tx"><b>${A.name} × ${q}</b><span class="muted">${A.desc}</span></div>
+          ${q ? `<button class="primary small" data-use="${k}">Utiliser</button>` : ''}</div>`;
+      }).join('')}
+      <div class="sec"><h3>Matériaux</h3>
+      ${Object.entries(MATERIALS).map(([k, M]) => `<div class="item" style="${inventory[k] ? '' : 'opacity:.45'}"><div class="ic">${M.icon}</div>
+        <div class="tx"><b>${M.name} × ${inventory[k] || 0}</b><span class="muted">${M.desc}</span></div></div>`).join('')}</div>
+      ${ONLINE ? `<div class="sec"><h3>🎁 Donner à un joueur</h3>
+        ${players.length && owned.length ? `<div class="row"><select id="gTo" style="flex:2">${players.map(p => `<option value="${esc(p.id)}">${esc(p.pseudo)}</option>`).join('')}</select>
+          <select id="gIt" style="flex:2">${itemOptions(owned)}</select><input id="gQ" type="number" min="1" value="1" style="flex:1"></div>
+          <div class="btns"><button id="gGo" class="primary">Donner</button></div>`
+          : '<p class="muted">Il faut un autre joueur et un objet à donner.</p>'}</div>` : ''}`;
+    $('mBody').querySelectorAll('[data-use]').forEach(b => b.onclick = () => {
+      const k = b.dataset.use; closeModal();
+      if (ARTIFACTS[k].target) arm(k); else useArtifact(k, null);
+    });
+    if ($('gGo')) $('gGo').onclick = async () => {
+      const to = $('gTo').value, name = $('gTo').selectedOptions[0].text, k = $('gIt').value, q = Math.max(1, Math.floor(+$('gQ').value) || 1);
+      if (await act(() => api.give(to, k, q), `🎁 Donné à ${name} : ${lbl(k, q)}`)) {
+        net.send('inv', { to, kind: k, delta: q, from: me.pseudo });
+        net.send('feed', { text: `🎁 ${me.pseudo} a donné ${lbl(k, q)} à ${name}` });
+        openBag('sac');
+      }
+    };
+  }
+  bindTabs(openBag);
+}
+panelRefreshers.bag = p => openBag(p.split(':')[1]);
+
+/* ---------- 🏪 Boutique et marché ---------- */
+async function openShop(tab = 'boutique') {
+  openModal('🏪 Commerce', '<p class="muted">Chargement…</p>', 'shop:' + tab);
+  await reloadInventory().catch(() => {});
+  const gold = inventory.or || 0;
+  const body = tabsHtml([['boutique', '🏬 Boutique'], ['marche', '🤝 Marché']], tab);
+  if (tab === 'boutique') {
+    const shop = cfg.shop || {};
+    $('mBody').innerHTML = body + `<div class="goldline">🪙 ${fmt.format(gold)}</div>
+      <p class="muted">Les pièces d’or se trouvent en cassant des blocs (environ 1 bloc sur ${fmt.format(cfg.gold_every || 0)}),
+      parfois par bourses entières, et en réussissant des missions.</p>` +
+      Object.entries(ARTIFACTS).map(([k, A]) => {
+        const p = shop[k] || 0;
+        return `<div class="item"><div class="ic">${A.icon}</div><div class="tx"><b>${A.name}</b><span class="muted">${A.desc}</span></div>
+          ${p > 0 ? `<button class="primary small" data-buy="${k}" ${gold >= p ? '' : 'disabled'}>${fmt.format(p)} 🪙</button>` : '<span class="muted">pas en vente</span>'}</div>`;
+      }).join('');
+    $('mBody').querySelectorAll('[data-buy]').forEach(b => b.onclick = async () => {
+      const k = b.dataset.buy;
+      if (await act(() => api.buy(k, 1), `🏬 Acheté : ${lbl(k)}`)) { sfx('coin'); await reloadInventory(); openShop('boutique'); }
+    });
+  } else {
+    let offers = [];
+    try { offers = await api.market(); } catch (e) { toast('⚠️ ' + e.message); }
+    const owned = ALL_ITEMS.filter(k => (inventory[k] || 0) > 0);
+    $('mBody').innerHTML = body + `
+      <p class="muted">Pour <b>vendre</b>, demande des 🪙. Pour <b>acheter</b>, propose des 🪙. Pour <b>troquer</b>, échange deux objets.
+      Ce que tu proposes est mis de côté jusqu’à ce que quelqu’un accepte (ou que tu retires l’offre).</p>
+      ${offers.length ? offers.map(o => {
+        const mine = o.seller === me.id;
+        const can = (inventory[o.want_kind] || 0) >= o.want_qty;
+        return `<div class="offer"><b>${esc(o.pseudo)}</b> donne <b>${lbl(o.give_kind, o.give_qty)}</b><br>contre <b>${lbl(o.want_kind, o.want_qty)}</b>
+          <div class="btns">${mine || me.isAdmin ? `<button class="small" data-cancel="${o.id}">Retirer</button>` : ''}
+          ${!mine ? `<button class="primary small" data-accept="${o.id}" ${can ? '' : 'disabled'}>Accepter</button>${can ? '' : '<span class="muted">tu n’en as pas assez</span>'}` : '<span class="muted">ton offre</span>'}</div></div>`;
+      }).join('') : '<p class="muted">Aucune offre pour l’instant.</p>'}
+      ${ONLINE ? `<div class="sec"><h3>➕ Nouvelle offre</h3>
+        ${owned.length ? `<label>Je donne</label><div class="row"><input id="oGq" type="number" min="1" value="1" style="flex:1"><select id="oG" style="flex:3">${itemOptions(owned)}</select></div>
+          <label>Contre</label><div class="row"><input id="oWq" type="number" min="1" value="1" style="flex:1"><select id="oW" style="flex:3">${itemOptions(ALL_ITEMS, 'or')}</select></div>
+          <div class="btns"><button id="oGo" class="primary">Publier l’offre</button></div>` : '<p class="muted">Tu n’as encore rien à proposer.</p>'}</div>`
+        : '<p class="muted">Le marché sert entre joueurs : il ne marche qu’en ligne.</p>'}`;
+    $('mBody').querySelectorAll('[data-accept]').forEach(b => b.onclick = async () => {
+      const o = offers.find(x => String(x.id) === b.dataset.accept);
+      if (await act(() => api.marketAccept(o.id), `🤝 Échange conclu : ${lbl(o.give_kind, o.give_qty)}`)) {
+        sfx('coin');
+        net.send('inv', { to: o.seller, kind: o.want_kind, delta: 0 });
+        net.send('market', { text: `🤝 ${me.pseudo} a accepté l’offre de ${o.pseudo} (${lbl(o.give_kind, o.give_qty)} contre ${lbl(o.want_kind, o.want_qty)})`, to: o.seller });
+        openShop('marche');
+      }
+    });
+    $('mBody').querySelectorAll('[data-cancel]').forEach(b => b.onclick = async () => {
+      if (await act(() => api.marketCancel(+b.dataset.cancel), 'Offre retirée')) { net.send('market', {}); openShop('marche'); }
+    });
+    if ($('oGo')) $('oGo').onclick = async () => {
+      const g = $('oG').value, gq = Math.max(1, Math.floor(+$('oGq').value) || 1), w = $('oW').value, wq = Math.max(1, Math.floor(+$('oWq').value) || 1);
+      if (await act(() => api.marketCreate(g, gq, w, wq), '📢 Offre publiée')) {
+        net.send('market', { text: `🏪 ${me.pseudo} propose ${lbl(g, gq)} contre ${lbl(w, wq)}` });
+        openShop('marche');
+      }
+    };
+  }
+  bindTabs(openShop);
+}
+panelRefreshers.shop = p => openShop(p.split(':')[1]);
+
+/* ---------- 📜 Missions ---------- */
+function missionText(m) {
+  switch (m.typ) {
+    case 'creuser': return m.param > 0 ? `Casse ${m.target} blocs à partir de la couche ${m.param + 1}` : `Casse ${m.target} blocs`;
+    case 'utiliser': return `Utilise ${lbl(m.item)}`;
+    case 'livrer': return `Livre ${lbl(m.item, m.target)}`;
+    case 'trouver': return `Trouve ${lbl(m.item, m.target)} en creusant`;
+    default: return m.typ;
+  }
+}
+async function openMissions() {
+  openModal('📜 Missions', '<p class="muted">Chargement…</p>', 'missions');
+  let ms = [];
+  try { ms = await api.missions(); await reloadInventory(); } catch (e) { $('mBody').innerHTML = `<p>⚠️ ${esc(e.message)}</p>`; return; }
+  $('mBody').innerHTML = `<p class="muted">Tes 3 missions personnelles, différentes de celles des autres joueurs.
+    Une mission réussie rapporte des 🪙 et est aussitôt remplacée. Il te manque un objet ? Va voir au 🏪 marché.</p>` +
+    ms.map(m => {
+      const have = m.typ === 'livrer' ? (inventory[m.item] || 0) : null;
+      const prog = m.typ === 'livrer' ? Math.min(have, m.target) : m.progress;
+      return `<div class="mission"><b>${esc(missionText(m))}</b>
+        <div class="prog"><i style="width:${Math.round(prog / m.target * 100)}%"></i></div>
+        <div class="row" style="justify-content:space-between"><span class="muted" style="opacity:.85">${fmt.format(prog)} / ${fmt.format(m.target)} · récompense <b style="color:var(--gold)">${m.reward} 🪙</b></span>
+        <span class="row">${m.typ === 'livrer' ? `<button class="primary small" data-deliver="${m.slot}" ${have >= m.target ? '' : 'disabled'}>Livrer</button>` : ''}
+        <button class="small" data-reroll="${m.slot}" ${(inventory.or || 0) >= 1 ? '' : 'disabled'} title="Changer de mission">🔄 1 🪙</button></span></div></div>`;
+    }).join('');
+  $('mBody').querySelectorAll('[data-deliver]').forEach(b => b.onclick = async () => {
+    const r = await act(() => api.deliver(+b.dataset.deliver), n => `📜 Mission accomplie ! +${n} 🪙`);
+    if (r) { sfx('treasure'); net.send('feed', { text: `📜 ${me.pseudo} a accompli une mission` }); openMissions(); }
   });
-  $('mBody').querySelectorAll('[data-give]').forEach(b => b.onclick = async () => {
-    const k = b.dataset.give, sel = $('mBody').querySelector(`[data-to="${k}"]`);
-    const to = sel.value, name = sel.options[sel.selectedIndex].text, A = ARTIFACTS[k];
-    try {
-      await backend.give(to, k);
-      inventory[k]--; renderInvBar();
-      backend.send('give', { to, from: me.pseudo, kind: k });
-      backend.send('feed', { text: `🎁 ${me.pseudo} a donné ${A.icon} ${A.name} à ${name}` });
-      toast(`🎁 ${A.icon} ${A.name} donné à ${name}`, true);
-      openInventory();
-    } catch (e) { toast('⚠️ ' + e.message); }
+  $('mBody').querySelectorAll('[data-reroll]').forEach(b => b.onclick = async () => {
+    if (await act(() => api.reroll(+b.dataset.reroll))) openMissions();
   });
 }
+panelRefreshers.missions = () => openMissions();
 
-/* ---------- Réglages ---------- */
+/* ---------- ⚙️ Réglages ---------- */
 function openSettings() {
-  const sizes = [10, 30, 50, 80, 100, 128];
   openModal('⚙️ Réglages', `
     <label>Sensibilité de rotation</label><input type="range" id="sRot" min="0.3" max="2" step="0.05" value="${settings.rot}">
     <label>Sensibilité du zoom (molette et pincement)</label><input type="range" id="sZoom" min="0.3" max="2" step="0.05" value="${settings.zoom}">
     <div class="btns"><button id="sSound">${settings.sound ? '🔊 Son activé' : '🔇 Son coupé'}</button>
       <button id="sFps">${settings.fps ? '📈 Masquer les performances' : '📈 Afficher les performances'}</button></div>
-    ${backend.online ? `<div class="sec"><p class="muted">Connecté en tant que <b>${esc(me.pseudo)}</b></p><button id="sOut">Se déconnecter</button></div>`
-      : `<div class="sec"><h3>Mode solo — taille du cube</h3><div class="seg">${sizes.map(s =>
-          `<button data-size="${s}" class="${s === N ? 'on' : ''}">${s}³</button>`).join('')}</div>
-          <p class="muted">Chaque taille garde sa propre progression.</p></div>`}`);
+    ${ONLINE ? `<div class="sec"><p class="muted">Connecté en tant que <b>${esc(me.pseudo)}</b></p><button id="sOut">Se déconnecter</button></div>`
+      : '<div class="sec"><p class="muted">Mode solo : la partie est sauvegardée dans ce navigateur. Taille et règles se changent dans 👑.</p></div>'}`, 'settings');
   $('sRot').oninput = e => { settings.rot = +e.target.value; saveSettings(); };
   $('sZoom').oninput = e => { settings.zoom = +e.target.value; saveSettings(); };
   $('sSound').onclick = () => { settings.sound = !settings.sound; saveSettings(); openSettings(); };
   $('sFps').onclick = () => { settings.fps = !settings.fps; saveSettings(); $('fps').classList.toggle('hidden', !settings.fps); openSettings(); };
-  if ($('sOut')) $('sOut').onclick = () => backend.logout();
-  $('mBody').querySelectorAll('[data-size]').forEach(b => b.onclick = async () => {
-    backend.persistNow?.();
-    try { localStorage.setItem('le-cube-size', b.dataset.size); } catch (e) {}
-    location.reload();
-  });
+  if ($('sOut')) $('sOut').onclick = () => net.logout();
 }
 
-/* ---------- Administration ---------- */
+/* ---------- 👑 Administration ---------- */
 async function openAdmin() {
-  openModal('👑 Administration', '<p class="muted">Chargement…</p>');
-  let cfg = { kind: 'noeud', message: '', image: '' }, players = [];
-  try { cfg = (await backend.getTreasure()) || cfg; } catch (e) {}
-  if (backend.online) { try { players = await backend.players(); } catch (e) { toast('⚠️ ' + e.message); } }
+  openModal('👑 Administration', '<p class="muted">Chargement…</p>', 'admin');
+  let tcfg = { kind: 'noeud', message: '', image: '' }, players = [];
+  try { tcfg = (await api.getTreasure()) || tcfg; } catch (e) {}
+  if (ONLINE) { try { players = await api.players(); } catch (e) { toast('⚠️ ' + e.message); } }
   const pend = players.filter(p => p.status === 'pending');
   const others = players.filter(p => p.status !== 'pending' && !p.is_admin);
   const locked = treasureRevealed;
   const row = (p, btns) => `<div class="item"><div class="tx"><b>${esc(p.pseudo)}</b><span class="muted">${esc(p.email || '')}</span></div>${btns}</div>`;
+  const shop = cfg.shop || {};
   $('mBody').innerHTML = `
-    ${backend.online ? `<h3 style="margin:0 0 6px">Inscriptions en attente (${pend.length})</h3>
-      ${pend.length ? pend.map(p => row(p, `<button class="primary" data-ok="${p.id}">✓ Valider</button><button class="danger" data-no="${p.id}">✕</button>`)).join('')
+    ${ONLINE ? `<h3>Inscriptions en attente (${pend.length})</h3>
+      ${pend.length ? pend.map(p => row(p, `<button class="primary small" data-ok="${p.id}">✓ Valider</button><button class="danger small" data-no="${p.id}">✕</button>`)).join('')
         : '<p class="muted">Personne en attente.</p>'}
       <div class="sec"><h3>Joueurs</h3>${others.length ? others.map(p => row(p, p.status === 'approved'
-        ? `<button class="danger" data-no="${p.id}">Retirer l’accès</button>` : `<span class="muted">refusé</span><button data-ok="${p.id}">Valider</button>`)).join('')
+        ? `<button class="danger small" data-no="${p.id}">Retirer l’accès</button>` : `<span class="muted">refusé</span><button class="small" data-ok="${p.id}">Valider</button>`)).join('')
         : '<p class="muted">Aucun joueur pour l’instant.</p>'}</div>` : ''}
-    <div class="${backend.online ? 'sec' : ''}"><h3>🎁 Ce qui apparaîtra au centre</h3>
-      ${locked ? '<p class="muted">Le trésor a été révélé : il ne peut plus être modifié.</p>' : '<p class="muted">Modifiable à tout moment tant que le cœur du cube n’est pas atteint. Secret pour les joueurs.</p>'}
-      <label>Objet</label><select id="tKind" ${locked ? 'disabled' : ''}>${Object.entries(TREASURES).map(([k, v]) => `<option value="${k}" ${cfg.kind === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
-      <label>Message gravé sur une plaque dorée (facultatif)</label><textarea id="tMsg" rows="2" maxlength="200" ${locked ? 'disabled' : ''}>${esc(cfg.message)}</textarea>
+
+    <div class="${ONLINE ? 'sec' : ''}"><h3>⚙️ Règles du jeu</h3>
+      <p class="muted">Modifiables à tout moment. Les blocs déjà entamés gardent leurs coups restants (sans dépasser le nouveau maximum).</p>
+      <label>Coups nécessaires pour casser un bloc (1 à 100)</label><input id="rHp" type="number" min="1" max="100" value="${MAX_HP}">
+      <label>Pièces d’or : 1 bloc sur… (0 = aucune)</label><input id="rGold" type="number" min="0" value="${cfg.gold_every}">
+      <label>Matériaux : 1 bloc sur… (0 = aucun)</label><input id="rMat" type="number" min="0" value="${cfg.mat_every}">
+      <div class="btns"><button id="rGo" class="primary">Appliquer les règles</button></div>
+      <label>Prix de la boutique en 🪙 (0 = pas en vente)</label>
+      ${Object.entries(ARTIFACTS).map(([k, A]) => `<div class="row" style="margin-bottom:6px"><span style="flex:2">${A.icon} ${A.name}</span>
+        <input type="number" min="0" data-price="${k}" value="${shop[k] || 0}" style="flex:1"></div>`).join('')}
+      <div class="btns"><button id="pGo" class="primary">Enregistrer les prix</button></div>
+    </div>
+
+    <div class="sec"><h3>🎁 Ce qui apparaîtra au centre</h3>
+      ${locked ? '<p class="muted">Le trésor a été révélé : il ne peut plus être modifié.</p>' : '<p class="muted">Modifiable jusqu’à la destruction du dernier bloc. Secret pour les joueurs. Le cœur du cube (doré) est indestructible tant que tout le reste n’est pas détruit.</p>'}
+      <label>Objet</label><select id="tKind" ${locked ? 'disabled' : ''}>${Object.entries(TREASURES).map(([k, v]) => `<option value="${k}" ${tcfg.kind === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+      <label>Message gravé sur une plaque dorée (facultatif)</label><textarea id="tMsg" rows="2" maxlength="200" ${locked ? 'disabled' : ''}>${esc(tcfg.message)}</textarea>
       <label>Photo (facultatif)</label>
-      <div class="btns" style="margin-top:0;align-items:center"><span id="tImgName" class="muted">${cfg.image ? '✓ une photo est choisie' : 'aucune photo'}</span>
-        ${locked ? '' : `<button id="tImgPick">📷 Choisir…</button><button id="tImgDel" class="${cfg.image ? '' : 'hidden'}">Retirer</button>`}</div>
+      <div class="btns" style="margin-top:0"><span id="tImgName" class="muted">${tcfg.image ? '✓ une photo est choisie' : 'aucune photo'}</span>
+        ${locked ? '' : `<button id="tImgPick" class="small">📷 Choisir…</button><button id="tImgDel" class="small ${tcfg.image ? '' : 'hidden'}">Retirer</button>`}</div>
       <input type="file" id="tImg" accept="image/*" class="hidden">
       <div class="btns"><button id="tSave" class="primary" ${locked ? 'disabled' : ''}>Enregistrer</button><button id="tPrev">👁 Aperçu</button></div>
     </div>
-    <div class="sec" id="admArt"><h3>🎒 Artefacts</h3><p class="muted">Chargement…</p></div>
+
+    <div class="sec" id="admArt"><h3>🎒 Artefacts et objets</h3><p class="muted">Chargement…</p></div>
+
     <div class="sec"><h3>🧊 Nouveau cube</h3>
-      <p class="muted">Efface toute la progression, les artefacts et les statistiques. Les comptes et le trésor sont conservés.</p>
-      <div class="btns" style="align-items:center"><select id="nSize" style="width:auto">${[30, 50, 80, 100, 128].map(s => `<option value="${s}" ${s === N ? 'selected' : ''}>${s}³ — ${fmt.format(s ** 3)} blocs</option>`).join('')}</select>
-      <button id="nGo" class="danger">Recommencer</button></div>
+      <p class="muted">Efface la progression, les artefacts, les inventaires (or compris), le marché, les missions et les statistiques.
+      Les comptes, les règles et le trésor sont conservés.</p>
+      <select id="nSize">${SIZES.map(s => `<option value="${s}" ${s === N ? 'selected' : ''}>${s}³ — ${fmt.format(s ** 3)} blocs${s > 128 ? ' (chargement plus long sur téléphone)' : ''}</option>`).join('')}</select>
+      <div class="btns"><button id="nGo" class="danger">Recommencer avec ce cube</button></div>
     </div>`;
-  const cur = { ...cfg };
-  $('mBody').querySelectorAll('[data-ok]').forEach(b => b.onclick = async () => { try { await backend.setStatus(b.dataset.ok, 'approved'); toast('✓ Joueur validé'); openAdmin(); } catch (e) { toast('⚠️ ' + e.message); } });
-  $('mBody').querySelectorAll('[data-no]').forEach(b => b.onclick = async () => { try { await backend.setStatus(b.dataset.no, 'refused'); openAdmin(); } catch (e) { toast('⚠️ ' + e.message); } });
+
+  const B = $('mBody');
+  B.querySelectorAll('[data-ok]').forEach(b => b.onclick = async () => { if (await act(() => api.setStatus(b.dataset.ok, 'approved'), '✓ Joueur validé')) openAdmin(); });
+  B.querySelectorAll('[data-no]').forEach(b => b.onclick = async () => { if (await act(() => api.setStatus(b.dataset.no, 'refused'))) openAdmin(); });
+  $('rGo').onclick = async () => {
+    const h = Math.max(1, Math.min(100, Math.floor(+$('rHp').value) || 10));
+    const g = Math.max(0, Math.floor(+$('rGold').value) || 0), m = Math.max(0, Math.floor(+$('rMat').value) || 0);
+    if (await act(() => api.setConfig(h, g, m), '✓ Règles appliquées')) {
+      net.send('reload', { text: `⚙️ L’organisateur a changé les règles (${h} coup${h > 1 ? 's' : ''} par bloc)` });
+      setTimeout(() => location.reload(), 900);
+    }
+  };
+  $('pGo').onclick = async () => {
+    try {
+      for (const inp of B.querySelectorAll('[data-price]')) await api.setPrice(inp.dataset.price, Math.max(0, Math.floor(+inp.value) || 0));
+      cfg = (await api.gameState()) || cfg;
+      net.send('config', { text: '🏬 Les prix de la boutique ont changé' });
+      toast('✓ Prix enregistrés', true);
+    } catch (e) { toast('⚠️ ' + e.message); }
+  };
+  const cur = { ...tcfg };
   const readForm = () => ({ kind: $('tKind').value, message: $('tMsg').value.trim(), image: cur.image || '' });
   if ($('tImgPick')) {
     $('tImgPick').onclick = () => $('tImg').click();
     $('tImg').onchange = async e => {
       const file = e.target.files[0]; if (!file) return;
       $('tImgName').textContent = 'envoi en cours…';
-      try { cur.image = await backend.uploadImage(file); $('tImgName').textContent = '✓ photo prête (pense à enregistrer)'; $('tImgDel').classList.remove('hidden'); }
+      try { cur.image = await net.uploadImage(file); $('tImgName').textContent = '✓ photo prête (pense à enregistrer)'; $('tImgDel').classList.remove('hidden'); }
       catch (err) { $('tImgName').textContent = '⚠️ ' + err.message; }
     };
     $('tImgDel').onclick = () => { cur.image = ''; $('tImgName').textContent = 'aucune photo (pense à enregistrer)'; $('tImgDel').classList.add('hidden'); };
   }
-  $('tSave').onclick = async () => { try { await backend.setTreasure(readForm()); toast('✓ Trésor enregistré', true); } catch (e) { toast('⚠️ ' + e.message); } };
+  $('tSave').onclick = () => act(() => api.setTreasure(readForm()), '✓ Trésor enregistré');
   $('tPrev').onclick = async () => {
-    const c = locked ? cfg : readForm();
+    const c = locked ? tcfg : readForm();
     closeModal();
     previewMode = !treasureRevealed;
     await showTreasure(c);
     setTreasureView(true);
     toast('👁 Aperçu du trésor. Bouton « 🧊 Cube » pour revenir.', true);
   };
-  renderAdminArtifacts(backend.online ? players.filter(p => p.status === 'approved') : [{ id: me.id, pseudo: me.pseudo }]);
   $('nGo').onclick = async () => {
     const s = +$('nSize').value;
-    if (!confirm(`Effacer toute la partie et recommencer avec un cube ${s}³ ?`)) return;
+    if (!confirm(`Effacer toute la partie et recommencer avec un cube ${s}³ (${fmt.format(s ** 3)} blocs) ?`)) return;
     if (!confirm('Vraiment sûr ? Ce n’est pas annulable.')) return;
-    try { await backend.newCube(s); backend.send('reset', {}); location.reload(); } catch (e) { toast('⚠️ ' + e.message); }
+    if (await act(() => api.newCube(s))) { net.send('reset', {}); location.reload(); }
   };
+  renderAdminArtifacts(ONLINE ? players.filter(p => p.status === 'approved') : [{ id: me.id, pseudo: me.pseudo }]);
 }
-
-/* ---------- Administration des artefacts ---------- */
 async function renderAdminArtifacts(players) {
   const box = $('admArt');
   if (!box) return;
   let data;
-  try { data = await backend.adminArtifacts(); }
-  catch (e) { box.innerHTML = `<h3>🎒 Artefacts</h3><p>⚠️ ${esc(e.message)}</p>`; return; }
+  try { data = await api.adminArtifacts(); }
+  catch (e) { box.innerHTML = `<h3>🎒 Artefacts et objets</h3><p>⚠️ ${esc(e.message)}</p>`; return; }
   const kinds = Object.entries(ARTIFACTS);
   const kOpts = kinds.map(([k, A]) => `<option value="${k}">${A.icon} ${A.name}</option>`).join('');
   const maxL = Math.ceil(N / 2);
   const owned = {};
-  for (const r of data.inventories || []) (owned[r.pseudo] ||= []).push(`${ARTIFACTS[r.kind]?.icon || r.kind} × ${r.qty}`);
+  for (const r of data.inventories || []) (owned[r.pseudo] ||= []).push(`${ITEM(r.kind).icon} ${fmt.format(r.qty)}`);
   let hiddenTotal = 0;
   const rows = kinds.map(([k, A]) => {
     const c = (data.kinds || {})[k] || { hidden: 0, found: 0 };
@@ -1299,64 +2520,60 @@ async function renderAdminArtifacts(players) {
     return `<div class="item" style="padding:5px 0"><div class="ic" style="font-size:20px">${A.icon}</div>
       <div class="tx">${A.name}</div><div class="muted" style="opacity:.9"><b>${c.hidden}</b> cachés · ${c.found} trouvés</div></div>`;
   }).join('');
-  box.innerHTML = `<h3>🎒 Artefacts</h3>
-    <p class="muted">${hiddenTotal} cachés en tout, soit environ 1 bloc sur ${fmt.format(Math.round(remaining / Math.max(1, hiddenTotal)))}.
+  box.innerHTML = `<h3>🎒 Artefacts et objets</h3>
+    <p class="muted">${hiddenTotal} artefacts cachés, soit environ 1 bloc sur ${fmt.format(Math.round(remaining / Math.max(1, hiddenTotal)))}.
     Leur position reste secrète, même pour toi.</p>
     ${rows}
     <label>Cacher ou retirer des artefacts dans le cube</label>
-    <div class="btns" style="margin-top:0"><select id="aK" style="flex:2">${kOpts}</select>
-      <input id="aQ" type="number" min="1" max="500" value="1" style="flex:1" aria-label="Quantité"></div>
-    <div class="btns" style="align-items:center"><span class="muted">Entre les couches</span>
+    <div class="row"><select id="aK" style="flex:2">${kOpts}</select><input id="aQ" type="number" min="1" max="500" value="1" style="flex:1"></div>
+    <div class="btns"><span class="muted">Entre les couches</span>
       <input id="aMin" type="number" min="1" max="${maxL}" value="1" style="width:72px"><span class="muted">et</span>
       <input id="aMax" type="number" min="1" max="${maxL}" value="${maxL}" style="width:72px"></div>
-    <p class="muted" style="margin:4px 0 0">Couche 1 = la surface, couche ${maxL} = le centre. Les artefacts ne vont que dans des blocs encore intacts.</p>
-    <div class="btns"><button class="primary" id="aAdd">➕ Cacher</button><button id="aDel">➖ Retirer</button>
-      <button class="danger" id="aDelAll">Retirer tous ceux de ce type</button></div>
+    <p class="muted" style="margin:4px 0 0">Couche 1 = la surface, couche ${maxL} = le centre.</p>
+    <div class="btns"><button class="primary small" id="aAdd">➕ Cacher</button><button class="small" id="aDel">➖ Retirer</button>
+      <button class="danger small" id="aDelAll">Retirer tous ceux de ce type</button></div>
     <label>Qui possède quoi</label>
     ${Object.keys(owned).length ? Object.entries(owned).map(([p, l]) => `<div style="font-size:13px;padding:2px 0"><b>${esc(p)}</b> : ${l.join(' · ')}</div>`).join('')
-      : '<p class="muted" style="margin:0">Personne n’a d’artefact pour l’instant.</p>'}
-    <label>Donner ou reprendre directement</label>
-    <div class="btns" style="margin-top:0"><select id="gP" style="flex:2">${players.map(p => `<option value="${esc(p.id)}">${esc(p.pseudo)}</option>`).join('')}</select>
-      <select id="gK" style="flex:2">${kOpts}</select><input id="gQ" type="number" min="1" max="99" value="1" style="flex:1" aria-label="Quantité"></div>
-    <div class="btns"><button class="primary" id="gAdd">🎁 Donner</button><button id="gDel">↩️ Reprendre</button></div>`;
-  const run = async (fn, okMsg) => {
-    try { const r = await fn(); toast(okMsg(r), true); renderAdminArtifacts(players); }
-    catch (e) { toast('⚠️ ' + e.message); }
-  };
-  const qty = id => Math.max(1, Math.min(500, Math.floor(+$(id).value) || 1));
-  const label = id => { const A = ARTIFACTS[$(id).value]; return `${A.icon} ${A.name}`; };
+      : '<p class="muted" style="margin:0">Personne n’a encore rien.</p>'}
+    <label>Donner ou reprendre directement (artefacts, matériaux, or)</label>
+    <div class="row"><select id="gP" style="flex:2">${players.map(p => `<option value="${esc(p.id)}">${esc(p.pseudo)}</option>`).join('')}</select>
+      <select id="gK" style="flex:2">${itemOptions(ALL_ITEMS)}</select><input id="gQ" type="number" min="1" value="1" style="flex:1"></div>
+    <div class="btns"><button class="primary small" id="gAdd">🎁 Donner</button><button class="small" id="gDel">↩️ Reprendre</button></div>`;
+  const run = async (fn, okMsg) => { if (await act(fn, okMsg) !== null) renderAdminArtifacts(players); };
+  const qty = id => Math.max(1, Math.min(9999, Math.floor(+$(id).value) || 1));
   $('aAdd').onclick = () => {
     const mn = Math.max(1, Math.min(maxL, +$('aMin').value || 1)), mx = Math.max(1, Math.min(maxL, +$('aMax').value || maxL));
-    run(() => backend.addArtifacts($('aK').value, qty('aQ'), Math.min(mn, mx) - 1, Math.max(mn, mx) - 1),
-      n => `${n} × ${label('aK')} caché${n > 1 ? 's' : ''} dans le cube`);
+    run(() => api.addArtifacts($('aK').value, Math.min(500, qty('aQ')), Math.min(mn, mx) - 1, Math.max(mn, mx) - 1),
+      n => `${n} × ${lbl($('aK').value)} caché${n > 1 ? 's' : ''} dans le cube`);
   };
-  $('aDel').onclick = () => run(() => backend.removeArtifacts($('aK').value, qty('aQ')), n => `${n} × ${label('aK')} retiré${n > 1 ? 's' : ''}`);
+  $('aDel').onclick = () => run(() => api.removeArtifacts($('aK').value, qty('aQ')), n => `${n} × ${lbl($('aK').value)} retiré${n > 1 ? 's' : ''}`);
   $('aDelAll').onclick = () => {
-    if (confirm(`Retirer du cube tous les « ${label('aK')} » encore cachés ?`))
-      run(() => backend.removeArtifacts($('aK').value, null), n => `${n} × ${label('aK')} retiré${n > 1 ? 's' : ''}`);
+    if (confirm(`Retirer du cube tous les « ${lbl($('aK').value)} » encore cachés ?`))
+      run(() => api.removeArtifacts($('aK').value, null), n => `${n} retiré${n > 1 ? 's' : ''}`);
   };
   const give = sign => {
     if (!$('gP').value) return;
     const to = $('gP').value, k = $('gK').value, d = sign * qty('gQ');
     run(async () => {
-      await backend.setInventory(to, k, d);
-      if (to === me.id) { inventory = await backend.inventory(); renderInvBar(); }
-      else backend.send('inv', { to, kind: k, delta: d });
-    }, () => sign > 0 ? `🎁 ${Math.abs(d)} × ${label('gK')} donné` : `↩️ ${Math.abs(d)} × ${label('gK')} repris`);
+      await api.setInventory(to, k, d);
+      if (to === me.id) await reloadInventory();
+      else net.send('inv', { to, kind: k, delta: d, from: 'L’organisateur' });
+    }, () => sign > 0 ? `🎁 ${lbl(k, Math.abs(d))} donné` : `↩️ ${lbl(k, Math.abs(d))} repris`);
   };
   $('gAdd').onclick = () => give(1);
   $('gDel').onclick = () => give(-1);
 }
 
 $('bBoard').onclick = openBoard;
-$('bInv').onclick = openInventory;
+$('bMissions').onclick = openMissions;
+$('bInv').onclick = () => openBag('sac');
+$('bShop').onclick = () => openShop('boutique');
 $('bSettings').onclick = openSettings;
 $('bAdmin').onclick = openAdmin;
 $('bTreasure').onclick = () => setTreasureView(!treasureView);
 $('bView').onclick = () => { $('banner').classList.remove('open'); setTreasureView(true); };
 $('bBannerClose').onclick = () => $('banner').classList.remove('open');
 $('fps').classList.toggle('hidden', !settings.fps);
-
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
@@ -1365,7 +2582,7 @@ addEventListener('resize', () => {
 });
 
 /* =====================================================================
-   11. OUTILS IMAGES
+   10. SERVEUR : mêmes fonctions en ligne (Supabase) et en solo (PGlite)
    ===================================================================== */
 async function downscaleImage(file, max = 900) {
   const bmp = await createImageBitmap(file);
@@ -1377,165 +2594,60 @@ async function downscaleImage(file, max = 900) {
 }
 const blobToDataURL = b => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(b); });
 
-/* =====================================================================
-   12. MODE SOLO (aucun serveur : simule exactement le serveur, sauvegarde locale)
-   ===================================================================== */
-function createLocalBackend() {
-  let size = 128;
-  try { const s = parseInt(localStorage.getItem('le-cube-size'), 10); if (s >= 10 && s <= 128) size = s; } catch (e) {}
-  const KEY = 'le-cube-solo-v2-' + size;
-  let shp, seed, st, inv, found, treasure;
-  const arts = new Map();
-  const rng = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
-  const rle = a => { const o = []; let v = a[0], c = 1; for (let i = 1; i < a.length; i++) { if (a[i] === v) c++; else { o.push(v + 'x' + c); v = a[i]; c = 1; } } o.push(v + 'x' + c); return o.join(','); };
-  const unrle = (s, a) => { let p = 0; for (const part of s.split(',')) { const [v, c] = part.split('x').map(Number); if (!(c > 0) || p + c > a.length || v > MAX_HP) return false; a.fill(v, p, p + c); p += c; } return p === a.length; };
-  function genArts() {
-    arts.clear();
-    const r = rng(seed), T = size ** 3;
-    for (const [k, c] of Object.entries(ART_COUNTS)) {
-      const n = Math.max(1, Math.round(c * T / 2097152));
-      for (let j = 0; j < n; j++) { const i = Math.floor(r() * T); if (!arts.has(i)) arts.set(i, k); }
-    }
-  }
-  function persist() { try { localStorage.setItem(KEY, JSON.stringify({ seed, hp: rle(shp), st, inv, found: [...found], treasure, arts: [...arts] })); } catch (e) {} }
-  const layerOf = i => Math.min(i % size, size - 1 - i % size, ((i / size) | 0) % size, size - 1 - ((i / size) | 0) % size, (i / (size * size)) | 0, size - 1 - ((i / (size * size)) | 0));
-  let pt = null;
-  const schedulePersist = () => { if (!pt) pt = setTimeout(() => { pt = null; persist(); }, 1500); };
-  addEventListener('pagehide', () => shp && persist());
-  function destroy(i) {
-    if (shp[i] === 0) return null;
-    shp[i] = 0; st.blocks++;
-    let a = '';
-    if (arts.has(i) && !found.has(i)) { found.add(i); a = arts.get(i); inv[a] = (inv[a] || 0) + 1; st.artifacts_found++; }
-    return a;
-  }
+function makeApi(call, callTable) {
   return {
-    online: false,
-    async start() { me = { id: 'moi', pseudo: 'Moi', isAdmin: true }; return { size }; },
-    async loadBlocks() {
-      shp = new Uint8Array(size ** 3).fill(MAX_HP);
-      st = { hits: 0, blocks: 0, artifacts_found: 0, artifacts_used: 0, best_break_ms: null, best_cps: 0, deepest: 0 };
-      inv = {}; found = new Set(); treasure = { kind: 'noeud', message: '', image: '' };
-      seed = (Math.random() * 2 ** 31) | 0;
-      try {
-        const d = JSON.parse(localStorage.getItem(KEY) || 'null');
-        if (d && unrle(d.hp, shp)) {
-          seed = d.seed; Object.assign(st, d.st); inv = d.inv || {}; found = new Set(d.found || []); treasure = d.treasure || treasure;
-          if (Array.isArray(d.arts)) for (const [i, k] of d.arts) arts.set(i, k);
-        } else shp.fill(MAX_HP);
-      } catch (e) { shp.fill(MAX_HP); }
-      if (!arts.size) genArts();
-      hp.set(shp);
-    },
-    async hit(list, ex) {
-      const out = [];
-      for (const [i, n0] of list) {
-        const n = Math.min(Math.max(n0, 1), 10);
-        if (shp[i] === 0) { out.push([i, 0, '']); continue; }
-        st.hits += n;
-        const v = Math.max(0, shp[i] - n);
-        let a = '';
-        if (v === 0) a = destroy(i); else shp[i] = v;
-        out.push([i, v, a]);
-      }
-      if (ex.best_ms != null) st.best_break_ms = st.best_break_ms == null ? ex.best_ms : Math.min(st.best_break_ms, ex.best_ms);
-      st.best_cps = Math.max(st.best_cps, ex.cps || 0);
-      st.deepest = Math.max(st.deepest, ex.deep || 0);
-      schedulePersist();
-      return out;
-    },
-    async use(k, center, dir) {
-      if (!(inv[k] > 0)) throw new Error('Tu n’as plus cet artefact');
-      inv[k]--; st.artifacts_used++;
-      const s = size, cx = center % s, cy = ((center / s) | 0) % s, cz = (center / (s * s)) | 0;
-      const res = { destroyed: [], found: [], radar: -1 };
-      const take = i => { const a = destroy(i); if (a !== null) { res.destroyed.push(i); if (a) res.found.push({ i, kind: a }); } };
-      if (k === 'bombe' || k === 'megabombe') {
-        const r = k === 'bombe' ? 1 : 3;
-        for (let z = Math.max(0, cz - r); z <= Math.min(s - 1, cz + r); z++)
-          for (let y = Math.max(0, cy - r); y <= Math.min(s - 1, cy + r); y++)
-            for (let x = Math.max(0, cx - r); x <= Math.min(s - 1, cx + r); x++) take(x + y * s + z * s * s);
-      } else if (k === 'foreuse') {
-        const d = DIRS[dir] || DIRS[0];
-        for (let t = 0; t < 15; t++) {
-          const x = cx + d[0] * t, y = cy + d[1] * t, z = cz + d[2] * t;
-          if (x < 0 || y < 0 || z < 0 || x >= s || y >= s || z >= s) break;
-          take(x + y * s + z * s * s);
-        }
-      } else if (k === 'radar') {
-        let bd = Infinity;
-        for (const i of arts.keys()) {
-          if (found.has(i)) continue;
-          const d = Math.abs(i % s - cx) + Math.abs(((i / s) | 0) % s - cy) + Math.abs(((i / (s * s)) | 0) - cz);
-          if (d < bd) { bd = d; res.radar = i; }
-        }
-      }
-      schedulePersist();
-      return res;
-    },
-    async give() { throw new Error('Les échanges ne marchent qu’en ligne'); },
-    async inventory() { return { ...inv }; },
-    async leaderboard() { return [{ id: 'moi', pseudo: 'Moi', ...st }]; },
-    async getTreasure() { return { ...treasure }; },
-    async setTreasure(c) { treasure = { kind: c.kind, message: c.message, image: c.image }; persist(); },
-    async uploadImage(file) { return blobToDataURL(await downscaleImage(file, 700)); },
-    async imageUrl(p) { return p; },
-    async newCube(s) { try { localStorage.removeItem('le-cube-solo-v2-' + s); localStorage.setItem('le-cube-size', String(s)); } catch (e) {} },
-    async adminArtifacts() {
-      const kinds = {};
-      for (const [i, k] of arts) { const c = kinds[k] ||= { hidden: 0, found: 0 }; found.has(i) ? c.found++ : c.hidden++; }
-      return { kinds, inventories: Object.entries(inv).filter(([, q]) => q > 0).map(([kind, qty]) => ({ id: 'moi', pseudo: 'Moi', kind, qty })) };
-    },
-    async addArtifacts(k, cnt, mn, mx) {
-      const lo = Math.max(0, mn), hi = size - 1 - lo, maxL = Math.min(mx, Math.floor((size - 1) / 2));
-      if (lo > maxL) throw new Error('Couches invalides');
-      let added = 0;
-      for (let t = 0; t < cnt * 200 && added < cnt; t++) {
-        const r = () => lo + Math.floor(Math.random() * (hi - lo + 1));
-        const i = r() + r() * size + r() * size * size;
-        if (shp[i] === 0 || arts.has(i) || layerOf(i) > maxL) continue;
-        arts.set(i, k); added++;
-      }
-      persist(); return added;
-    },
-    async removeArtifacts(k, cnt) {
-      const list = [...arts].filter(([i, kk]) => kk === k && !found.has(i)).sort(() => Math.random() - 0.5);
-      const take = cnt == null ? list : list.slice(0, cnt);
-      for (const [i] of take) arts.delete(i);
-      persist(); return take.length;
-    },
-    async setInventory(p, k, delta) { inv[k] = Math.max(0, (inv[k] || 0) + delta); persist(); return inv[k]; },
-    async resync() { return null; },
-    send() {}, onMessage() {}, onPresence() {}, logout() {},
-    persistNow: () => shp && persist(),
+    me: () => call('me'),
+    gameState: () => call('game_state'),
+    getBlocks: () => call('get_blocks'),
+    hit: async (list, ex) => (await call('hit_blocks', { idx: list.map(e => e[0]), n: list.map(e => e[1]), best_ms: ex.best_ms, cps: ex.cps, deep: ex.deep })) || { r: [], msgs: [] },
+    use: (k, center, dir) => call('use_artifact', { k, center, dir }),
+    inventory: async () => (await call('get_inventory')) || {},
+    give: (to, k, qty) => call('give_item', { to_player: to, k, qty }),
+    leaderboard: async () => (await callTable('get_leaderboard')) || [],
+    getTreasure: () => call('get_treasure'),
+    setTreasure: c => call('set_treasure', { k: c.kind, msg: c.message, img: c.image }),
+    players: async () => (await callTable('admin_players')) || [],
+    setStatus: (p, s) => call('admin_set_status', { p, s }),
+    newCube: s => call('admin_new_cube', { new_size: s }),
+    adminArtifacts: () => call('admin_artifacts'),
+    addArtifacts: (k, cnt, mn, mx) => call('admin_add_artifacts', { k, cnt, min_layer: mn, max_layer: mx }),
+    removeArtifacts: (k, cnt) => call('admin_remove_artifacts', { k, cnt }),
+    setInventory: (p, k, delta) => call('admin_set_inventory', { p, k, delta }),
+    setConfig: (h, g, m) => call('admin_set_config', { p_max_hp: h, p_gold_every: g, p_mat_every: m }),
+    setPrice: (k, pr) => call('admin_set_price', { p_kind: k, p_price: pr }),
+    buy: (k, q) => call('shop_buy', { p_kind: k, p_qty: q }),
+    craft: k => call('craft', { p_kind: k }),
+    market: async () => (await call('market_list')) || [],
+    marketCreate: (g, gq, w, wq) => call('market_create', { p_give: g, p_give_qty: gq, p_want: w, p_want_qty: wq }),
+    marketCancel: id => call('market_cancel', { p_id: id }),
+    marketAccept: id => call('market_accept', { p_id: id }),
+    missions: async () => (await call('get_missions')) || [],
+    deliver: s => call('deliver_mission', { p_slot: s }),
+    reroll: s => call('reroll_mission', { p_slot: s }),
   };
 }
+const parseBlocks = txt => {
+  const out = [];
+  if (txt) for (const part of txt.split(',')) { const c = part.indexOf(':'); out.push([+part.slice(0, c), +part.slice(c + 1)]); }
+  return out;
+};
 
-/* =====================================================================
-   13. MODE EN LIGNE (Supabase)
-   ===================================================================== */
-async function createOnlineBackend() {
+/* ---------- En ligne ---------- */
+async function createOnline() {
   const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
   const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
-  let ch = null, handler = () => {}, presenceCb = () => {};
-  const rpc = async (fn, args) => {
+  const call = async (fn, args) => {
     const { data, error } = await sb.rpc(fn, args);
     if (error) throw new Error(error.message);
     return data;
   };
-  const parseBlocks = txt => {
-    const out = [];
-    if (txt) for (const part of txt.split(',')) { const c = part.indexOf(':'); out.push([+part.slice(0, c), +part.slice(c + 1)]); }
-    return out;
-  };
-  return {
-    online: true,
+  api = makeApi(call, call);
+  let ch = null, handler = () => {}, presenceCb = () => {};
+  net = {
     async start() {
       const prof = await authFlow(sb);
       me = { id: prof.id, pseudo: prof.pseudo, isAdmin: prof.is_admin };
       $('loading').style.display = 'flex';
-      const g = await rpc('game_state');
-      if (!g) throw new Error('Accès non autorisé');
       const { data: { session } } = await sb.auth.getSession();
       await sb.realtime.setAuth(session.access_token);
       sb.auth.onAuthStateChange((_e, s) => { if (s?.access_token) sb.realtime.setAuth(s.access_token); });
@@ -1545,23 +2657,27 @@ async function createOnlineBackend() {
         const st = ch.presenceState();
         presenceCb(Object.values(st).map(a => a[0]?.pseudo).filter(Boolean));
       });
+      // reconnexion automatique : on ne prévient qu'après 15 s de coupure
+      let live = false, warned = false, warnTimer = null, everLive = false;
       ch.subscribe(async status => {
-        if (status === 'SUBSCRIBED') await ch.track({ pseudo: me.pseudo });
-        else if (status === 'CHANNEL_ERROR') toast('⚠️ Temps réel indisponible (les coups des autres arriveront au prochain rechargement)');
+        if (status === 'SUBSCRIBED') {
+          clearTimeout(warnTimer); warnTimer = null;
+          if (warned) toast('✓ Direct rétabli');
+          if (everLive) handler({ type: 'resync' });
+          live = true; warned = false; everLive = true;
+          await ch.track({ pseudo: me.pseudo });
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          live = false;
+          if (!warnTimer && !warned) warnTimer = setTimeout(() => {
+            warnTimer = null;
+            if (!live) { warned = true; toast('⚠️ Direct interrompu : les coups des autres s’afficheront à la reconnexion'); }
+          }, 15000);
+        }
       });
-      return { size: g.size };
     },
-    async loadBlocks() { for (const [i, v] of parseBlocks(await rpc('get_blocks'))) if (i >= 0 && i < TOTAL) hp[i] = v; },
-    async resync() { return parseBlocks(await rpc('get_blocks')); },
-    hit: (list, ex) => rpc('hit_blocks', { idx: list.map(e => e[0]), n: list.map(e => e[1]), best_ms: ex.best_ms, cps: ex.cps, deep: ex.deep }),
-    use: (k, center, dir) => rpc('use_artifact', { k, center, dir }),
-    give: (to, k) => rpc('give_artifact', { to_player: to, k }),
-    inventory: async () => (await rpc('get_inventory')) || {},
-    leaderboard: async () => (await rpc('get_leaderboard')) || [],
-    players: async () => (await rpc('admin_players')) || [],
-    setStatus: (p, s) => rpc('admin_set_status', { p, s }),
-    getTreasure: () => rpc('get_treasure'),
-    setTreasure: c => rpc('set_treasure', { k: c.kind, msg: c.message, img: c.image }),
+    send(type, payload) { ch?.send({ type: 'broadcast', event: 'msg', payload: { type, ...payload } }); },
+    onMessage(fn) { handler = fn; },
+    onPresence(fn) { presenceCb = fn; },
     async uploadImage(file) {
       const blob = await downscaleImage(file);
       const path = 'photo-' + Date.now() + '.jpg';
@@ -1574,15 +2690,50 @@ async function createOnlineBackend() {
       if (error) throw new Error(error.message);
       return data.signedUrl;
     },
-    newCube: s => rpc('admin_new_cube', { new_size: s }),
-    adminArtifacts: () => rpc('admin_artifacts'),
-    addArtifacts: (k, cnt, mn, mx) => rpc('admin_add_artifacts', { k, cnt, min_layer: mn, max_layer: mx }),
-    removeArtifacts: (k, cnt) => rpc('admin_remove_artifacts', { k, cnt }),
-    setInventory: (p, k, delta) => rpc('admin_set_inventory', { p, k, delta }),
-    send(type, payload) { ch?.send({ type: 'broadcast', event: 'msg', payload: { type, ...payload } }); },
-    onMessage(fn) { handler = fn; },
-    onPresence(fn) { presenceCb = fn; },
     async logout() { await sb.auth.signOut(); location.reload(); },
+  };
+}
+
+/* ---------- Solo : le même moteur SQL, exécuté dans le navigateur ---------- */
+const SOLO_STUB = `
+do $$ begin
+  if not exists (select from pg_roles where rolname = 'anon') then create role anon; end if;
+  if not exists (select from pg_roles where rolname = 'authenticated') then create role authenticated; end if;
+end $$;
+create schema if not exists auth; create schema if not exists storage; create schema if not exists realtime;
+create table if not exists auth.users (id uuid primary key default gen_random_uuid(), email text, raw_user_meta_data jsonb);
+create or replace function auth.uid() returns uuid language sql stable as $f$ select nullif(current_setting('solo.uid', true), '')::uuid $f$;
+create table if not exists storage.buckets (id text primary key, name text, public boolean);
+create table if not exists storage.objects (id serial primary key, bucket_id text, name text);
+alter table storage.objects enable row level security;
+create table if not exists realtime.messages (id serial primary key, topic text);
+alter table realtime.messages enable row level security;`;
+async function createSolo() {
+  $('loading').textContent = 'Démarrage du moteur solo…';
+  const { PGlite } = await import('https://cdn.jsdelivr.net/npm/@electric-sql/pglite@0.5.10/dist/index.js');
+  let db;
+  try { db = await PGlite.create('idb://le-cube-solo'); } catch (e) { console.warn('sauvegarde indisponible', e); db = await PGlite.create(); }
+  await db.exec(SOLO_STUB);
+  await db.exec($('soloSql').textContent);
+  let uid = (await db.query("select id from auth.users where email = 'moi@solo'")).rows[0]?.id;
+  if (!uid) uid = (await db.query(`insert into auth.users (email, raw_user_meta_data) values ('moi@solo', '{"pseudo":"Moi"}') returning id`)).rows[0].id;
+  await db.exec(`set solo.uid = '${uid}'`);
+  const call = async (fn, args = {}) => {
+    const keys = Object.keys(args);
+    const sql = `select public.${fn}(${keys.map((k, i) => `${k} => $${i + 1}`).join(', ')}) as r`;
+    try { return (await db.query(sql, keys.map(k => args[k] ?? null))).rows[0].r; }
+    catch (e) { throw new Error(e.message); }
+  };
+  const callTable = async fn => (await db.query(`select * from public.${fn}()`)).rows;
+  api = makeApi(call, callTable);
+  window.leCubeSolo = { api, db };   // pratique pour déboguer en solo
+  net = {
+    async start() { const p = await api.me(); me = { id: p.id, pseudo: p.pseudo, isAdmin: p.is_admin }; },
+    send(type, payload) { if (type === 'reload' || type === 'reset') return; },
+    onMessage() {}, onPresence(fn) { fn(['Moi']); },
+    async uploadImage(file) { return blobToDataURL(await downscaleImage(file, 700)); },
+    async imageUrl(p) { return p; },
+    logout() {},
   };
 }
 
@@ -1642,35 +2793,43 @@ function authFlow(sb) {
 }
 
 /* =====================================================================
-   14. MESSAGES DES AUTRES JOUEURS
+   11. MESSAGES DES AUTRES JOUEURS
    ===================================================================== */
+async function resyncBlocks() {
+  try { for (const [i, v] of parseBlocks(await api.getBlocks())) if (i >= 0 && i < TOTAL) setHp(i, v, 'net'); } catch (e) {}
+}
 function onNetMessage(m) {
   if (!ready) return;
-  if (m.type === 'hits' && Array.isArray(m.r)) {
+  if (m.type === 'resync') resyncBlocks();
+  else if (m.type === 'hits' && Array.isArray(m.r)) {
     for (let k = 0; k + 1 < m.r.length; k += 2) { const i = m.r[k]; if (i >= 0 && i < TOTAL) setHp(i, m.r[k + 1], 'net'); }
   } else if (m.type === 'feed') toast(m.text);
-  else if (m.type === 'give' && m.to === me.id) {
-    backend.inventory().then(inv => { inventory = inv; renderInvBar(); });
-    const A = ARTIFACTS[m.kind];
-    if (A) toast(`🎁 ${m.from} t’a donné ${A.icon} ${A.name} !`, true);
-  } else if (m.type === 'inv' && m.to === me.id) {
-    backend.inventory().then(inv => { inventory = inv; if (armed && !(inventory[armed] > 0)) disarm(); renderInvBar(); });
-    const A = ARTIFACTS[m.kind];
-    if (A && m.delta > 0) toast(`🎁 L’organisateur t’a offert ${A.icon} ${A.name} !`, true);
+  else if (m.type === 'inv' && m.to === me.id) {
+    reloadInventory().then(() => { if (armed && !(inventory[armed] > 0)) disarm(); });
+    if (m.delta > 0 && m.kind) toast(`🎁 ${m.from || 'Quelqu’un'} t’a donné ${lbl(m.kind, m.delta)} !`, true);
+  } else if (m.type === 'market') {
+    if (m.text) toast(m.text, m.to === me.id);
+    if (m.to === me.id) { reloadInventory(); sfx('coin'); }
+    refreshPanel('shop');
+  } else if (m.type === 'config') {
+    if (m.text) toast(m.text);
+    api.gameState().then(c => { if (c) cfg = c; refreshPanel('shop'); });
+  } else if (m.type === 'reload') {
+    toast(m.text || '⚙️ Les règles ont changé…', true);
+    setTimeout(() => location.reload(), 2500);
   } else if (m.type === 'reset') {
     toast('🧊 Un nouveau cube commence…', true);
     setTimeout(() => location.reload(), 2000);
   }
 }
 let hiddenAt = 0;
-document.addEventListener('visibilitychange', async () => {
-  if (document.hidden) { hiddenAt = Date.now(); if (pending.size) flushHits(); backend?.persistNow?.(); return; }
-  if (!ready || !backend.online || Date.now() - hiddenAt < 20000) return;
-  try { for (const [i, v] of await backend.resync()) if (i >= 0 && i < TOTAL) setHp(i, v, 'net'); } catch (e) {}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { hiddenAt = Date.now(); if (pending.size) flushHits(); return; }
+  if (ready && ONLINE && Date.now() - hiddenAt > 20000) resyncBlocks();
 });
 
 /* =====================================================================
-   15. BOUCLE DE RENDU (ne redessine que si quelque chose change)
+   12. BOUCLE DE RENDU
    ===================================================================== */
 let needsRender = true, flash = 0;
 function requestRender() { needsRender = true; }
@@ -1731,20 +2890,22 @@ function loop() {
 }
 
 /* =====================================================================
-   16. DÉMARRAGE
+   13. DÉMARRAGE
    ===================================================================== */
 async function boot() {
   try {
-    backend = ONLINE ? await createOnlineBackend() : createLocalBackend();
-    const info = await backend.start();
+    if (ONLINE) await createOnline(); else await createSolo();
+    await net.start();
+    cfg = await api.gameState();
+    if (!cfg) throw new Error('Accès non autorisé');
     $('loading').textContent = 'Préparation du cube…';
-    N = info.size; NN = N * N; TOTAL = NN * N; HALF = (N - 1) / 2;
+    await sleep(0);
+    N = cfg.size; NN = N * N; TOTAL = NN * N; HALF = (N - 1) / 2; MAX_HP = cfg.max_hp || 10;
     coreLo = N % 2 === 0 ? N / 2 - 1 : HALF - 1;
     coreHi = N % 2 === 0 ? N / 2 : HALF + 1;
     coreSize = coreHi - coreLo + 1;
     hp = new Uint8Array(TOTAL).fill(MAX_HP);
-    slotOf = new Int32Array(TOTAL).fill(-1);
-    await backend.loadBlocks();
+    for (const [i, v] of parseBlocks(await api.getBlocks())) if (i >= 0 && i < TOTAL) hp[i] = Math.min(v, MAX_HP);
     remaining = 0;
     for (let i = 0; i < TOTAL; i++) if (hp[i] > 0) remaining++;
     coreRemaining = 0;
@@ -1754,11 +2915,11 @@ async function boot() {
     buildAllFaces();
     camera.far = N * 10; camera.updateProjectionMatrix();
     camera.position.copy(new THREE.Vector3(1, 0.75, 1.25).normalize().multiplyScalar(defaultDistance()));
-    backend.onMessage(onNetMessage);
-    backend.onPresence(names => { onlineNames = names; hudDirty = true; });
-    try { inventory = (await backend.inventory()) || {}; } catch (e) {}
+    net.onMessage(onNetMessage);
+    net.onPresence(names => { onlineNames = names; hudDirty = true; });
+    try { inventory = await api.inventory(); } catch (e) {}
     try {
-      const mine = (await backend.leaderboard()).find(r => r.id === me.id);
+      const mine = (await api.leaderboard()).find(r => r.id === me.id);
       if (mine) { myStats.hits = +mine.hits; myStats.blocks = +mine.blocks; }
     } catch (e) {}
     renderInvBar();
@@ -1766,7 +2927,7 @@ async function boot() {
     if (coreRemaining === 0) onCoreDone(false);
     $('loading').style.display = 'none';
     ready = true;
-    if (!ONLINE) toast('Mode solo (aucun serveur configuré)');
+    if (!ONLINE) toast('Mode solo : partie sauvegardée dans ce navigateur');
     loop();
   } catch (e) {
     console.error(e);
