@@ -57,6 +57,30 @@
   #tools{position:fixed;right:8px;left:8px;bottom:calc(10px + env(safe-area-inset-bottom));display:flex;gap:5px;justify-content:flex-end;z-index:3}
   #tools button{background:#16131cdd;font-size:17px;padding:8px 10px}
   #bTreasure{background:#ffc83d33!important;border-color:#ffc83d99;font-size:14px!important}
+  #bChat{position:relative}
+  #chatBadge{position:absolute;right:-5px;top:-7px;background:#ff5d6c;color:#fff;font-size:10px;font-weight:700;border-radius:9px;padding:1px 5px;min-width:10px;text-align:center}
+  #chat{position:fixed;right:8px;bottom:calc(60px + env(safe-area-inset-bottom));width:min(380px,calc(100vw - 16px));
+    height:min(62vh,560px);display:flex;flex-direction:column;background:#16131cf5;border:1px solid var(--line);border-radius:16px;
+    z-index:8;box-shadow:0 12px 40px #000a;overflow:hidden;-webkit-user-select:text;user-select:text}
+  #chat .chead{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #ffffff14}
+  #chat .chead b{font-size:16px}
+  #chatList{flex:1;overflow-y:auto;padding:10px 10px 4px;display:flex;flex-direction:column;gap:6px;overscroll-behavior:contain}
+  .cm{max-width:86%;align-self:flex-start;background:#ffffff0d;border:1px solid #ffffff12;border-radius:14px 14px 14px 4px;padding:6px 10px;font-size:14px;line-height:1.35;word-wrap:break-word;overflow-wrap:anywhere;position:relative}
+  .cm.mine{align-self:flex-end;background:#ffc83d1f;border-color:#ffc83d44;border-radius:14px 14px 4px 14px}
+  .cm .who{font-size:12px;font-weight:700;margin-bottom:1px}
+  .cm .when{font-size:10px;opacity:.5;margin-left:6px;font-weight:400}
+  .cm .del{position:absolute;top:2px;right:4px;background:none;border:none;padding:2px 4px;font-size:12px;opacity:.5}
+  .cev{align-self:center;font-size:12px;opacity:.7;text-align:center;padding:2px 8px;max-width:92%}
+  .cday{align-self:center;font-size:11px;opacity:.45;margin:4px 0}
+  #chatMore{align-self:center;font-size:12px;padding:4px 10px}
+  #chat .cfoot{border-top:1px solid #ffffff14;padding:8px}
+  #chatEmo{display:flex;gap:4px;margin-bottom:6px;overflow-x:auto}
+  #chatEmo button{padding:3px 7px;font-size:17px;background:transparent;border-color:#ffffff1a}
+  #chat .crow{display:flex;gap:6px}
+  #chatInput{flex:1;border-radius:20px;padding:9px 14px}
+  #chatSend{border-radius:20px;padding:8px 14px}
+  .gauge{height:10px;border-radius:5px;background:#ffffff1a;overflow:hidden;margin:6px 0 4px}
+  .gauge i{display:block;height:100%;background:linear-gradient(90deg,#5fd27a,#ffd34d 70%,#ff6b6b)}
 
   .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#000b;z-index:10;padding:10px}
   .modal.open{display:flex}
@@ -115,6 +139,7 @@
 <div id="invBar"></div>
 <div id="tools">
   <button id="bTreasure" class="hidden">✨ Trésor</button>
+  <button id="bChat" title="Salon de discussion">💬<b id="chatBadge" class="hidden"></b></button>
   <button id="bBoard" title="Classement">🏆</button>
   <button id="bMissions" title="Missions">📜</button>
   <button id="bInv" title="Sac et atelier">🎒</button>
@@ -159,6 +184,15 @@
   </div>
   <p id="aMsg"></p>
 </div></div>
+
+<div id="chat" class="hidden">
+  <div class="chead"><b>💬 Salon</b><button id="chatClose" class="small">✕</button></div>
+  <div id="chatList"></div>
+  <div class="cfoot">
+    <div id="chatEmo"></div>
+    <div class="crow"><input id="chatInput" maxlength="500" placeholder="Écrire un message…" autocomplete="off" enterkeyhint="send"><button id="chatSend" class="primary">➤</button></div>
+  </div>
+</div>
 
 <div id="loading">Chargement du cube…</div>
 
@@ -335,6 +369,15 @@ alter table public.shop      enable row level security;
 alter table public.recipes   enable row level security;
 alter table public.market    enable row level security;
 alter table public.missions  enable row level security;
+
+-- Salon de discussion (les 5 000 derniers messages au maximum, environ 1 Mo)
+create table if not exists public.chat (
+  id         bigserial primary key,
+  player     uuid references public.profiles(id) on delete set null,
+  body       text not null check (char_length(body) between 1 and 500),
+  created_at timestamptz not null default now()
+);
+alter table public.chat enable row level security;
 
 insert into public.game (id) values (1) on conflict (id) do nothing;
 insert into public.treasure (id) values (1) on conflict (id) do nothing;
@@ -998,6 +1041,7 @@ begin
   delete from public.stats;
   delete from public.market;
   delete from public.missions;
+  -- (le salon est conservé : on le vide séparément si on veut)
   update public.game set size = new_size, started_at = now(), revealed_at = null, destroyed = 0,
          seed = floor(random() * 2000000000)::int where id = 1;
   perform public._regen(new_size);
@@ -1074,6 +1118,83 @@ begin
     on conflict (player, kind) do update set qty = greatest(inv.qty + coalesce(delta, 0), 0)
     returning qty into q;
   return q;
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 5 bis. SALON DE DISCUSSION ET ESPACE DISQUE
+-- ---------------------------------------------------------------------
+create or replace function public._chat_row(c public.chat) returns json
+language sql stable security definer set search_path = public as $$
+  select json_build_object('id', c.id, 'player', c.player,
+    'pseudo', coalesce((select pseudo from public.profiles where id = c.player), 'Ancien joueur'),
+    'body', c.body, 'at', c.created_at);
+$$;
+
+create or replace function public.chat_send(p_body text) returns json
+language plpgsql security definer set search_path = public as $$
+declare b text := trim(coalesce(p_body, '')); last_at timestamptz; c public.chat;
+begin
+  if not public.is_approved() then raise exception 'Accès non autorisé'; end if;
+  if b = '' then raise exception 'Message vide'; end if;
+  if char_length(b) > 500 then raise exception 'Message trop long (500 caractères maximum)'; end if;
+  select max(created_at) into last_at from public.chat where player = auth.uid();
+  if last_at is not null and last_at > now() - interval '700 milliseconds' then
+    raise exception 'Doucement ! Un message à la fois';
+  end if;
+  insert into public.chat (player, body) values (auth.uid(), b) returning * into c;
+  -- garde-fou : jamais plus de 5 000 messages
+  if c.id % 100 = 0 then
+    delete from public.chat where id <= (select id from public.chat order by id desc offset 5000 limit 1);
+  end if;
+  return public._chat_row(c);
+end $$;
+
+-- Messages les plus récents (ou plus anciens que before_id), du plus ancien au plus récent
+create or replace function public.chat_list(before_id bigint default null, lim int default 60) returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_approved() then raise exception 'Accès non autorisé'; end if;
+  return (select coalesce(json_agg(public._chat_row(t) order by t.id), '[]'::json) from (
+    select * from public.chat c where before_id is null or c.id < before_id
+    order by c.id desc limit least(greatest(coalesce(lim, 60), 1), 200)) t);
+end $$;
+
+create or replace function public.admin_chat_delete(p_id bigint) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur'; end if;
+  delete from public.chat where id = p_id;
+end $$;
+
+-- Vider le salon : older_days = 0 efface tout, sinon les messages plus vieux que X jours
+create or replace function public.admin_chat_clear(older_days int default 0) returns bigint
+language plpgsql security definer set search_path = public as $$
+declare n bigint;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur'; end if;
+  if coalesce(older_days, 0) <= 0 then
+    select count(*) into n from public.chat;
+    truncate public.chat;                    -- libère immédiatement l'espace disque
+  else
+    delete from public.chat where created_at < now() - make_interval(days => older_days);
+    get diagnostics n = row_count;
+  end if;
+  return n;
+end $$;
+
+-- Place occupée dans la base (pour la jauge du panneau admin)
+create or replace function public.admin_db_size() returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur'; end if;
+  return json_build_object(
+    'total', pg_database_size(current_database()),
+    'blocks', pg_total_relation_size('public.blocks'),
+    'chat', pg_total_relation_size('public.chat'),
+    'chat_count', (select count(*) from public.chat),
+    'blocks_count', (select count(*) from public.blocks),
+    'limit', 500 * 1024 * 1024
+  );
 end $$;
 
 -- Premier remplissage des artefacts
@@ -2098,6 +2219,8 @@ function sfx(type) {
       o.frequency.setValueAtTime(220 + Math.random() * 40, t); o.frequency.exponentialRampToValueAtTime(70, t + 0.07);
       g.gain.setValueAtTime(0.16, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
       o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + 0.09);
+    } else if (type === 'chat') {
+      tone(880, t, 0.12, 0.07); tone(1175, t + 0.08, 0.16, 0.06);
     } else if (type === 'coin') {
       tone(1318, t, 0.12, 0.12, 'square'); tone(1760, t + 0.07, 0.25, 0.1, 'square');
     } else if (type === 'treasure') {
@@ -2447,10 +2570,12 @@ async function openAdmin() {
 
     <div class="sec" id="admArt"><h3>🎒 Artefacts et objets</h3><p class="muted">Chargement…</p></div>
 
+    <div class="sec" id="admDisk"><h3>💾 Espace de la base et salon</h3><p class="muted">Chargement…</p></div>
+
     <div class="sec"><h3>🧊 Nouveau cube</h3>
       <p class="muted">Efface la progression, les artefacts, les inventaires (or compris), le marché, les missions et les statistiques.
       Les comptes, les règles et le trésor sont conservés.</p>
-      <select id="nSize">${SIZES.map(s => `<option value="${s}" ${s === N ? 'selected' : ''}>${s}³ — ${fmt.format(s ** 3)} blocs${s > 128 ? ' (chargement plus long sur téléphone)' : ''}</option>`).join('')}</select>
+      <select id="nSize">${SIZES.map(s => `<option value="${s}" ${s === N ? 'selected' : ''}>${s}³ — ${fmt.format(s ** 3)} blocs · jusqu’à ≈ ${fmtMo(estimateMo(s))}${estimateMo(s) > 400 ? ' ⚠️ trop gros pour l’offre gratuite' : ''}</option>`).join('')}</select>
       <div class="btns"><button id="nGo" class="danger">Recommencer avec ce cube</button></div>
     </div>`;
 
@@ -2496,11 +2621,13 @@ async function openAdmin() {
   };
   $('nGo').onclick = async () => {
     const s = +$('nSize').value;
+    if (ONLINE && estimateMo(s) > 400 && !confirm(`⚠️ Un cube ${s}³ entièrement détruit occuperait environ ${fmtMo(estimateMo(s))} dans la base, au-delà des 500 Mo de l’offre gratuite de Supabase. Continuer quand même ?`)) return;
     if (!confirm(`Effacer toute la partie et recommencer avec un cube ${s}³ (${fmt.format(s ** 3)} blocs) ?`)) return;
     if (!confirm('Vraiment sûr ? Ce n’est pas annulable.')) return;
     if (await act(() => api.newCube(s))) { net.send('reset', {}); location.reload(); }
   };
   renderAdminArtifacts(ONLINE ? players.filter(p => p.status === 'approved') : [{ id: me.id, pseudo: me.pseudo }]);
+  renderAdminDisk();
 }
 async function renderAdminArtifacts(players) {
   const box = $('admArt');
@@ -2564,6 +2691,168 @@ async function renderAdminArtifacts(players) {
   $('gDel').onclick = () => give(-1);
 }
 
+/* =====================================================================
+   SALON DE DISCUSSION
+   Les messages sont gardés dans la base (5 000 au maximum, ~1 Mo).
+   Les annonces du jeu (trésor, bourse, marché…) ne sont PAS stockées :
+   elles s'affichent seulement chez ceux qui sont connectés.
+   ===================================================================== */
+const chat = { open: false, loaded: false, msgs: [], events: [], unread: 0, oldest: null, more: true, sending: false };
+const seenKey = () => 'le-cube-chat-vu-' + (me?.id || '');
+const getSeen = () => { try { return +localStorage.getItem(seenKey()) || 0; } catch (e) { return 0; } };
+const setSeen = id => { try { localStorage.setItem(seenKey(), String(id)); } catch (e) {} };
+const nameColor = n => { let h = 0; for (const c of String(n)) h = (h * 31 + c.codePointAt(0)) >>> 0; return `hsl(${h % 360} 75% 70%)`; };
+const hhmm = d => new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+const dayLabel = d => {
+  const x = new Date(d), t = new Date(), y = new Date(Date.now() - 864e5);
+  if (x.toDateString() === t.toDateString()) return 'Aujourd’hui';
+  if (x.toDateString() === y.toDateString()) return 'Hier';
+  return x.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+};
+function updateChatBadge() {
+  const b = $('chatBadge');
+  b.textContent = chat.unread > 99 ? '99+' : String(chat.unread);
+  b.classList.toggle('hidden', chat.unread === 0 || chat.open);
+}
+function renderChat(keepScroll = false) {
+  const list = $('chatList');
+  const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
+  const prevH = list.scrollHeight, prevTop = list.scrollTop;
+  list.textContent = '';
+  if (chat.more && chat.msgs.length) {
+    const b = document.createElement('button'); b.id = 'chatMore'; b.className = 'small'; b.textContent = 'Messages plus anciens';
+    b.onclick = loadOlder; list.appendChild(b);
+  }
+  const items = [...chat.msgs.map(m => ({ t: new Date(m.at).getTime(), m })), ...chat.events.map(e => ({ t: e.t, e }))].sort((a, b) => a.t - b.t);
+  if (!items.length) {
+    const p = document.createElement('div'); p.className = 'cev'; p.textContent = 'Aucun message pour l’instant. Dis bonjour 👋'; list.appendChild(p);
+  }
+  let lastDay = '';
+  for (const it of items) {
+    const day = dayLabel(it.t);
+    if (day !== lastDay) { const d = document.createElement('div'); d.className = 'cday'; d.textContent = day; list.appendChild(d); lastDay = day; }
+    if (it.e) { const d = document.createElement('div'); d.className = 'cev'; d.textContent = it.e.text; list.appendChild(d); continue; }
+    const m = it.m, el = document.createElement('div');
+    el.className = 'cm' + (m.player === me.id ? ' mine' : '');
+    const who = document.createElement('div'); who.className = 'who'; who.style.color = nameColor(m.pseudo);
+    who.textContent = m.player === me.id ? 'Moi' : m.pseudo;
+    const when = document.createElement('span'); when.className = 'when'; when.textContent = hhmm(m.at); who.appendChild(when);
+    const body = document.createElement('div'); body.textContent = m.body;
+    el.append(who, body);
+    if (me.isAdmin) {
+      el.style.paddingRight = '26px';
+      const del = document.createElement('button'); del.className = 'del'; del.title = 'Supprimer ce message'; del.textContent = '🗑';
+      del.onclick = async () => { if (await act(() => api.chatDelete(m.id))) { chatRemove(m.id); net.send('chatdel', { id: m.id }); } };
+      el.appendChild(del);
+    }
+    list.appendChild(el);
+  }
+  if (keepScroll) list.scrollTop = prevTop + (list.scrollHeight - prevH);
+  else if (atBottom || !chat.loaded) list.scrollTop = list.scrollHeight;
+}
+async function chatReload() {
+  try {
+    chat.msgs = await api.chatList(null, 60);
+    chat.more = chat.msgs.length >= 60;
+    chat.loaded = true;
+    const last = chat.msgs.length ? chat.msgs[chat.msgs.length - 1].id : 0;
+    if (chat.open) setSeen(last);
+    else { const seen = getSeen(); chat.unread = chat.msgs.filter(m => m.id > seen && m.player !== me.id).length; }
+    updateChatBadge();
+    if (chat.open) { renderChat(); $('chatList').scrollTop = 1e9; }
+  } catch (e) { console.warn('salon', e); }
+}
+async function loadOlder() {
+  if (!chat.msgs.length) return;
+  try {
+    const older = await api.chatList(chat.msgs[0].id, 60);
+    chat.more = older.length >= 60;
+    chat.msgs = [...older, ...chat.msgs];
+    renderChat(true);
+  } catch (e) { toast('⚠️ ' + e.message); }
+}
+function chatReceive(m) {
+  if (chat.msgs.some(x => x.id === m.id)) return;
+  chat.msgs.push(m);
+  if (chat.msgs.length > 400) chat.msgs.splice(0, chat.msgs.length - 400);
+  if (chat.open) { setSeen(m.id); renderChat(); }
+  else if (m.player !== me.id) {
+    chat.unread++; updateChatBadge();
+    toast(`💬 ${m.pseudo} : ${m.body.length > 70 ? m.body.slice(0, 70) + '…' : m.body}`);
+    sfx('chat');
+  }
+}
+function chatRemove(id) { chat.msgs = chat.msgs.filter(m => m.id !== id); if (chat.open) renderChat(); }
+function chatEvent(text) {
+  if (!text) return;
+  chat.events.push({ t: Date.now(), text });
+  if (chat.events.length > 60) chat.events.shift();
+  if (chat.open) renderChat();
+}
+async function chatSendNow() {
+  const inp = $('chatInput'), body = inp.value.trim();
+  if (!body || chat.sending) return;
+  chat.sending = true; $('chatSend').disabled = true;
+  try {
+    const m = await api.chatSend(body);
+    inp.value = '';
+    chatReceive(m);
+    net.send('chat', { m });
+  } catch (e) { toast('⚠️ ' + e.message); }
+  chat.sending = false; $('chatSend').disabled = false;
+  if (!isMobile) inp.focus();
+}
+function openChat() {
+  chat.open = true;
+  $('chat').classList.remove('hidden');
+  chat.unread = 0; updateChatBadge();
+  if (!chat.loaded) { $('chatList').innerHTML = '<div class="cev">Chargement…</div>'; chatReload(); }
+  else { renderChat(); $('chatList').scrollTop = 1e9; if (chat.msgs.length) setSeen(chat.msgs[chat.msgs.length - 1].id); }
+  if (!isMobile) setTimeout(() => $('chatInput').focus(), 50);
+}
+function closeChat() { chat.open = false; $('chat').classList.add('hidden'); $('chatInput').blur(); updateChatBadge(); }
+$('bChat').onclick = () => chat.open ? closeChat() : openChat();
+$('chatClose').onclick = closeChat;
+$('chatSend').onclick = chatSendNow;
+$('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); chatSendNow(); } });
+for (const em of ['👍', '😂', '🎉', '💣', '⛏️', '🪙', '😮', '❤️', '🔥', '🤝']) {
+  const b = document.createElement('button'); b.textContent = em;
+  b.onclick = () => { const i = $('chatInput'); i.value += em; if (!isMobile) i.focus(); };
+  $('chatEmo').appendChild(b);
+}
+
+/* ---------- Jauge d'espace disque (panneau admin) ---------- */
+const BYTES_PER_BLOCK = 60;                       // mesuré : ~59 octets par bloc entamé ou détruit
+const estimateMo = s => s ** 3 * BYTES_PER_BLOCK / 1048576;
+const fmtMo = mo => mo < 10 ? mo.toFixed(1).replace('.', ',') + ' Mo' : fmt.format(Math.round(mo)) + ' Mo';
+async function renderAdminDisk() {
+  const box = $('admDisk');
+  if (!box) return;
+  let d;
+  try { d = await api.dbSize(); } catch (e) { box.innerHTML = `<h3>💾 Espace de la base et salon</h3><p>⚠️ ${esc(e.message)}</p>`; return; }
+  const mo = b => b / 1048576, lim = mo(d.limit), tot = mo(d.total), pc = Math.min(100, tot / lim * 100);
+  const full = estimateMo(N);
+  box.innerHTML = `<h3>💾 Espace de la base et salon</h3>
+    <div class="row" style="justify-content:space-between"><b>${fmtMo(tot)} utilisés</b><span class="muted">sur ${fmtMo(lim)} (offre gratuite)</span></div>
+    <div class="gauge"><i style="width:${pc.toFixed(1)}%"></i></div>
+    <div class="muted" style="opacity:.85;line-height:1.6">
+      🧊 Cube : ${fmtMo(mo(d.blocks))} (${fmt.format(d.blocks_count)} blocs entamés ou détruits)<br>
+      💬 Salon : ${fmtMo(mo(d.chat))} (${fmt.format(d.chat_count)} message${d.chat_count > 1 ? 's' : ''}, 5 000 au maximum)<br>
+      📈 Ce cube ${N}³ entièrement détruit occupera environ <b>${fmtMo(full)}</b>${full > 400 ? ' ⚠️ trop pour l’offre gratuite' : ''}.
+    </div>
+    <div class="btns"><button id="dOld" class="small">🧹 Effacer les messages de plus de 7 jours</button>
+      <button id="dAll" class="danger small">🗑 Vider tout le salon</button></div>`;
+  $('dOld').onclick = async () => {
+    const n = await act(() => api.chatClear(7));
+    if (n !== null) { toast(`🧹 ${fmt.format(n === true ? 0 : n)} message(s) effacé(s)`, true); net.send('chatclear', {}); chatReload(); renderAdminDisk(); }
+  };
+  $('dAll').onclick = async () => {
+    if (!confirm('Effacer définitivement tous les messages du salon ?')) return;
+    const n = await act(() => api.chatClear(0));
+    if (n !== null) { toast(`🗑 Salon vidé (${fmt.format(n === true ? 0 : n)} message(s))`, true); net.send('chatclear', {}); chatReload(); renderAdminDisk(); }
+  };
+}
+
 $('bBoard').onclick = openBoard;
 $('bMissions').onclick = openMissions;
 $('bInv').onclick = () => openBag('sac');
@@ -2624,6 +2913,11 @@ function makeApi(call, callTable) {
     missions: async () => (await call('get_missions')) || [],
     deliver: s => call('deliver_mission', { p_slot: s }),
     reroll: s => call('reroll_mission', { p_slot: s }),
+    chatSend: body => call('chat_send', { p_body: body }),
+    chatList: async (before, lim) => (await call('chat_list', { before_id: before ?? null, lim: lim ?? 60 })) || [],
+    chatDelete: id => call('admin_chat_delete', { p_id: id }),
+    chatClear: days => call('admin_chat_clear', { older_days: days }),
+    dbSize: () => call('admin_db_size'),
   };
 }
 const parseBlocks = txt => {
@@ -2675,7 +2969,10 @@ async function createOnline() {
         }
       });
     },
-    send(type, payload) { ch?.send({ type: 'broadcast', event: 'msg', payload: { type, ...payload } }); },
+    send(type, payload) {
+      if ((type === 'feed' || type === 'market') && payload?.text) chatEvent(payload.text);
+      ch?.send({ type: 'broadcast', event: 'msg', payload: { type, ...payload } });
+    },
     onMessage(fn) { handler = fn; },
     onPresence(fn) { presenceCb = fn; },
     async uploadImage(file) {
@@ -2729,7 +3026,7 @@ async function createSolo() {
   window.leCubeSolo = { api, db };   // pratique pour déboguer en solo
   net = {
     async start() { const p = await api.me(); me = { id: p.id, pseudo: p.pseudo, isAdmin: p.is_admin }; },
-    send(type, payload) { if (type === 'reload' || type === 'reset') return; },
+    send(type, payload) { if ((type === 'feed' || type === 'market') && payload?.text) chatEvent(payload.text); },
     onMessage() {}, onPresence(fn) { fn(['Moi']); },
     async uploadImage(file) { return blobToDataURL(await downscaleImage(file, 700)); },
     async imageUrl(p) { return p; },
@@ -2803,12 +3100,15 @@ function onNetMessage(m) {
   if (m.type === 'resync') resyncBlocks();
   else if (m.type === 'hits' && Array.isArray(m.r)) {
     for (let k = 0; k + 1 < m.r.length; k += 2) { const i = m.r[k]; if (i >= 0 && i < TOTAL) setHp(i, m.r[k + 1], 'net'); }
-  } else if (m.type === 'feed') toast(m.text);
+  } else if (m.type === 'feed') { toast(m.text); chatEvent(m.text); }
+  else if (m.type === 'chat' && m.m) chatReceive(m.m);
+  else if (m.type === 'chatdel') chatRemove(m.id);
+  else if (m.type === 'chatclear') chatReload();
   else if (m.type === 'inv' && m.to === me.id) {
     reloadInventory().then(() => { if (armed && !(inventory[armed] > 0)) disarm(); });
     if (m.delta > 0 && m.kind) toast(`🎁 ${m.from || 'Quelqu’un'} t’a donné ${lbl(m.kind, m.delta)} !`, true);
   } else if (m.type === 'market') {
-    if (m.text) toast(m.text, m.to === me.id);
+    if (m.text) { toast(m.text, m.to === me.id); chatEvent(m.text); }
     if (m.to === me.id) { reloadInventory(); sfx('coin'); }
     refreshPanel('shop');
   } else if (m.type === 'config') {
@@ -2924,6 +3224,7 @@ async function boot() {
     } catch (e) {}
     renderInvBar();
     $('bAdmin').classList.toggle('hidden', !me.isAdmin);
+    chatReload();
     if (coreRemaining === 0) onCoreDone(false);
     $('loading').style.display = 'none';
     ready = true;
