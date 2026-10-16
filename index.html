@@ -50,7 +50,7 @@
     width:max-content;max-width:calc(100vw - 32px);box-sizing:border-box;text-align:center;pointer-events:none;transition:opacity .8s}
   #fps{position:fixed;left:10px;bottom:calc(60px + env(safe-area-inset-bottom));font:11px ui-monospace,Menlo,monospace;
     opacity:.55;pointer-events:none;white-space:pre;line-height:1.5}
-  #invBar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(62px + env(safe-area-inset-bottom));display:flex;gap:8px;z-index:3}
+  #invBar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(62px + env(safe-area-inset-bottom));display:flex;flex-wrap:wrap;justify-content:center;gap:8px;z-index:3;width:max-content;max-width:calc(100vw - 24px)}
   #invBar button{font-size:20px;padding:5px 10px;position:relative;background:#16131cdd}
   #invBar button b{position:absolute;right:-5px;top:-7px;background:var(--gold);color:#000;font-size:10px;border-radius:8px;padding:1px 5px}
   #invBar button.on{border-color:var(--gold);box-shadow:0 0 14px #ffc83d99}
@@ -262,6 +262,10 @@ alter table public.game add column if not exists gold_every int not null default
 alter table public.game add column if not exists mat_every  int not null default 60;   -- 1 bloc sur X contient un matériau (0 = jamais)
 alter table public.game add column if not exists seed       int not null default floor(random() * 2000000000)::int;
 alter table public.game add column if not exists destroyed  bigint not null default 0;  -- blocs détruits (tenu à jour)
+-- Effets en cours pour tout le monde (version 4)
+alter table public.game add column if not exists rally_until timestamptz;   -- 📯 Cor de ralliement
+alter table public.game add column if not exists eye_until   timestamptz;   -- 👁️ Œil du Cube
+alter table public.game add column if not exists arts_v4     boolean not null default false;
 
 create table if not exists public.treasure (
   id         int primary key default 1 check (id = 1),
@@ -309,6 +313,8 @@ alter table public.stats add column if not exists materials_found int not null d
 alter table public.stats add column if not exists crafted         int not null default 0;
 alter table public.stats add column if not exists trades          int not null default 0;
 alter table public.stats add column if not exists missions_done   int not null default 0;
+alter table public.stats add column if not exists peels           int not null default 0;  -- 🧅 Écorces arrachées
+alter table public.stats add column if not exists magnet_until    timestamptz;              -- 🧲 Aimant actif jusqu'à
 
 -- Boutique : prix en pièces d'or (0 = pas en vente)
 create table if not exists public.shop (
@@ -316,7 +322,9 @@ create table if not exists public.shop (
   price int not null default 0
 );
 insert into public.shop (kind, price) values
-  ('radar', 15), ('marteau', 20), ('foreuse', 25), ('bombe', 30), ('megabombe', 200)
+  ('radar', 15), ('marteau', 20), ('foreuse', 25), ('bombe', 30), ('megabombe', 200),
+  ('sonde', 10), ('scie', 25), ('aimant', 30), ('seisme', 35), ('cor', 40),
+  ('ecorce', 0), ('oeil', 0)                   -- les deux légendaires ne se vendent jamais
 on conflict (kind) do nothing;
 
 -- Recettes de l'atelier
@@ -329,7 +337,14 @@ insert into public.recipes (result, ingredients) values
   ('marteau',   '{"fer": 4, "or": 3}'),
   ('bombe',     '{"poudre": 3, "fer": 2}'),
   ('foreuse',   '{"cristal": 2, "fer": 3}'),
-  ('megabombe', '{"bombe": 3, "cristal": 3}')
+  ('megabombe', '{"bombe": 3, "cristal": 3}'),
+  ('scie',      '{"fer": 3, "silex": 2}'),
+  ('seisme',    '{"poudre": 3, "cristal": 1}'),
+  ('aimant',    '{"fer": 4, "cristal": 1}'),
+  ('cor',       '{"or": 2, "cristal": 2, "fer": 2}'),
+  ('sonde',     '{"silex": 3, "fer": 1}'),
+  ('ecorce',    '{"megabombe": 2, "cristal": 10, "or": 100}'),
+  ('oeil',      '{"radar": 3, "cristal": 5, "or": 50}')
 on conflict (result) do nothing;
 
 -- Marché entre joueurs : l'objet proposé est mis de côté jusqu'à la vente
@@ -391,11 +406,14 @@ update public.game set destroyed = (select count(*) from public.blocks where hp 
 -- Anciennes versions dont le format change
 drop function if exists public._destroy(int, uuid);
 drop function if exists public.get_leaderboard();
+drop function if exists public._loot(int);
+drop function if exists public._reward(int, uuid);
+drop function if exists public._destroy(int, uuid);
 
 create or replace function public._check_kind(k text) returns void
 language plpgsql immutable as $$
 begin
-  if k is null or k not in ('bombe', 'foreuse', 'marteau', 'radar', 'megabombe') then
+  if k is null or k not in ('bombe', 'foreuse', 'marteau', 'radar', 'megabombe', 'scie', 'seisme', 'aimant', 'cor', 'sonde', 'ecorce', 'oeil') then
     raise exception 'Type d''artefact inconnu';
   end if;
 end $$;
@@ -403,10 +421,14 @@ end $$;
 create or replace function public._check_item(k text) returns void
 language plpgsql immutable as $$
 begin
-  if k is null or k not in ('bombe', 'foreuse', 'marteau', 'radar', 'megabombe', 'or', 'silex', 'fer', 'poudre', 'cristal') then
+  if k is null or k not in ('bombe', 'foreuse', 'marteau', 'radar', 'megabombe', 'scie', 'seisme', 'aimant', 'cor', 'sonde', 'ecorce', 'oeil', 'or', 'silex', 'fer', 'poudre', 'cristal') then
     raise exception 'Objet inconnu';
   end if;
 end $$;
+
+-- Artefacts légendaires : jamais en vente contre de l'or
+create or replace function public._legendary(k text) returns boolean
+language sql immutable as $$ select k in ('ecorce', 'oeil'); $$;
 
 -- Couche d'un bloc : 0 = surface
 create or replace function public._depth(idx int, s int) returns int
@@ -508,7 +530,8 @@ $$;
 
 -- Butin d'un bloc : calculé à partir de sa position et d'une graine secrète,
 -- donc identique quel que soit le joueur qui le casse. Renvoie 'or:5', 'fer:1'… ou null.
-create or replace function public._loot(idx int) returns text
+-- mult = 3 quand l'🧲 Aimant du joueur est actif.
+create or replace function public._loot(idx int, mult int default 1) returns text
 language plpgsql stable security definer set search_path = public as $$
 declare g record; h1 float8; h2 float8; h3 float8; t float8;
 begin
@@ -517,13 +540,13 @@ begin
          ((seed::bigint + 99991) % 2147483647)::int as seed3
     into g from public.game where id = 1;
   h1 := (hashint4(idx # g.seed)::bigint + 2147483648) / 4294967296.0;
-  if g.gold_every > 0 and h1 < 1.0 / g.gold_every then
+  if g.gold_every > 0 and h1 < mult::float8 / g.gold_every then
     h3 := (hashint4(idx # g.seed3)::bigint + 2147483648) / 4294967296.0;
     return 'or:' || case when h3 < 0.025 then 20 when h3 < 0.2 then 5 else 1 end;   -- 2,5 % de bourses de 20
   end if;
   h2 := (hashint4(idx # g.seed2)::bigint + 2147483648) / 4294967296.0;
-  if g.mat_every > 0 and h2 < 1.0 / g.mat_every then
-    h3 := h2 * g.mat_every;
+  if g.mat_every > 0 and h2 < mult::float8 / g.mat_every then
+    h3 := h2 * g.mat_every / mult;
     t := public._depth(idx, g.size)::float8 / greatest(1, (g.size - 1) / 2);
     return case
       when t < 0.25 then (case when h3 < 0.7 then 'silex' else 'fer' end)
@@ -536,7 +559,7 @@ begin
 end $$;
 
 -- Récompenses d'un bloc détruit : artefact caché + butin. Renvoie {artefact, butin}.
-create or replace function public._reward(idx int, uid uuid) returns text[]
+create or replace function public._reward(idx int, uid uuid, mult int default 1) returns text[]
 language plpgsql security definer set search_path = public as $$
 declare a text; l text; lk text; lq int;
 begin
@@ -544,7 +567,7 @@ begin
     where artifacts.i = idx and found_by is null
     returning kind into a;
   if a is not null then perform public._add(uid, a, 1); end if;
-  l := public._loot(idx);
+  l := public._loot(idx, mult);
   if l is not null then
     lk := split_part(l, ':', 1); lq := split_part(l, ':', 2)::int;
     perform public._add(uid, lk, lq);
@@ -554,7 +577,7 @@ begin
 end $$;
 
 -- Détruit un bloc. Renvoie null s'il l'était déjà, sinon {artefact, butin}.
-create or replace function public._destroy(idx int, uid uuid) returns text[]
+create or replace function public._destroy(idx int, uid uuid, mult int default 1) returns text[]
 language plpgsql security definer set search_path = public as $$
 declare v smallint; s int;
 begin
@@ -564,16 +587,31 @@ begin
     on conflict (i) do update set hp = 0 where b.hp > 0
     returning b.hp into v;
   if v is null then return null; end if;
-  return public._reward(idx, uid);
+  return public._reward(idx, uid, mult);
 end $$;
 
--- Cache des artefacts au hasard (121 pour un cube 128³, proportionnel ailleurs)
-create or replace function public._regen(s int) returns void
+-- Multiplicateur de butin du joueur (🧲 Aimant : ×3 pendant 3 minutes)
+create or replace function public._mult(uid uuid) returns int
+language sql stable security definer set search_path = public as $$
+  select case when exists (select 1 from public.stats where player = uid and magnet_until > now()) then 3 else 1 end;
+$$;
+
+-- Cache des artefacts au hasard dans les blocs encore intacts
+-- (pour un cube 128³ : 233 artefacts, dont 1 Écorce du Monde et 2 Œils du Cube ; proportionnel ailleurs)
+drop function if exists public._regen(int);
+create or replace function public._regen(s int, only_kinds text[] default null) returns void
 language sql security definer set search_path = public as $$
   insert into public.artifacts (i, kind)
-  select floor(random() * (s::bigint * s * s))::int, k.kind
-  from (values ('bombe', 40), ('foreuse', 30), ('marteau', 25), ('radar', 20), ('megabombe', 6)) as k(kind, cnt),
-       generate_series(1, greatest(1, round(k.cnt * (s::numeric * s * s) / 2097152)::int))
+  select c.cell, c.kind from (
+    select floor(random() * (s::bigint * s * s))::int as cell, k.kind
+    from (values ('bombe', 40), ('foreuse', 30), ('marteau', 25), ('radar', 20), ('megabombe', 6),
+                 ('scie', 25), ('sonde', 25), ('seisme', 15), ('aimant', 15), ('cor', 10),
+                 ('ecorce', 1), ('oeil', 2)) as k(kind, cnt),
+         generate_series(1, greatest(1, round(k.cnt * (s::numeric * s * s) / 2097152)::int))
+    where only_kinds is null or k.kind = any(only_kinds)
+  ) c
+  where not exists (select 1 from public.blocks b where b.i = c.cell and b.hp = 0)
+    and not public._is_core(c.cell, s)
   on conflict (i) do nothing;
 $$;
 
@@ -581,7 +619,7 @@ $$;
 create or replace function public._new_mission(p_uid uuid, p_slot int) returns void
 language plpgsql security definer set search_path = public as $$
 declare r float8 := random(); s int; dp int; t text; it text := null; pa int := 0; tg int; rw int;
-  arts text[] := array['bombe', 'foreuse', 'marteau', 'radar'];
+  arts text[] := array['bombe', 'foreuse', 'marteau', 'radar', 'scie', 'sonde', 'seisme', 'aimant', 'cor'];
   mats text[] := array['silex', 'fer', 'poudre', 'cristal'];
 begin
   select size into s from public.game where id = 1;
@@ -590,13 +628,13 @@ begin
     t := 'creuser'; pa := least(greatest((s - 1) / 2 - 3, 0), dp + floor(random() * 4)::int);
     tg := 15 + floor(random() * 31)::int; rw := greatest(2, tg / 6 + pa / 3);
   elsif r < 0.55 then
-    t := 'utiliser'; it := arts[1 + floor(random() * 4)::int]; tg := 1; rw := public._value(it) / 2 + 5;
+    t := 'utiliser'; it := arts[1 + floor(random() * 9)::int]; tg := 1; rw := public._value(it) / 2 + 5;
   elsif r < 0.8 then
     t := 'livrer';
     if random() < 0.75 then
       it := mats[1 + floor(random() * 4)::int]; tg := 2 + floor(random() * 4)::int; rw := tg * public._value(it) * 2 + 2;
     else
-      it := arts[1 + floor(random() * 4)::int]; tg := 1; rw := (public._value(it) * 3) / 2;
+      it := arts[1 + floor(random() * 9)::int]; tg := 1; rw := (public._value(it) * 3) / 2;
     end if;
   else
     t := 'trouver'; it := mats[1 + floor(random() * 4)::int]; tg := 1 + floor(random() * 3)::int;
@@ -635,14 +673,15 @@ begin
   return msgs;
 end $$;
 
-revoke execute on function public._destroy(int, uuid) from public, anon, authenticated;
-revoke execute on function public._reward(int, uuid) from public, anon, authenticated;
-revoke execute on function public._loot(int) from public, anon, authenticated;
+revoke execute on function public._destroy(int, uuid, int) from public, anon, authenticated;
+revoke execute on function public._reward(int, uuid, int) from public, anon, authenticated;
+revoke execute on function public._loot(int, int) from public, anon, authenticated;
+revoke execute on function public._mult(uuid) from public, anon, authenticated;
 revoke execute on function public._stats(uuid, int, int, int, int, int, int, int) from public, anon, authenticated;
 revoke execute on function public._bump(uuid, int, int, int, int, int) from public, anon, authenticated;
 revoke execute on function public._add(uuid, text, int) from public, anon, authenticated;
 revoke execute on function public._take(uuid, text, int) from public, anon, authenticated;
-revoke execute on function public._regen(int) from public, anon, authenticated;
+revoke execute on function public._regen(int, text[]) from public, anon, authenticated;
 revoke execute on function public._new_mission(uuid, int) from public, anon, authenticated;
 revoke execute on function public._missions_progress(uuid, int[], text[], text) from public, anon, authenticated;
 
@@ -661,6 +700,11 @@ language sql stable security definer set search_path = public as $$
   select case when public.is_approved() then json_build_object(
     'size', size, 'revealed', revealed_at is not null, 'max_hp', max_hp, 'destroyed', destroyed,
     'gold_every', gold_every, 'mat_every', mat_every,
+    'rally_left', greatest(0, extract(epoch from rally_until - now())),
+    'eye_left', greatest(0, extract(epoch from eye_until - now())),
+    'eye', case when eye_until > now() then
+      (select coalesce(json_agg(a.i), '[]'::json) from (select ar.i from public.artifacts ar where ar.found_by is null limit 3000) a) end,
+    'magnet_left', (select greatest(0, extract(epoch from st.magnet_until - now())) from public.stats st where st.player = auth.uid()),
     'shop', (select coalesce(json_object_agg(kind, price), '{}'::json) from public.shop),
     'recipes', (select coalesce(json_object_agg(result, ingredients), '{}'::json) from public.recipes)
   ) end
@@ -680,13 +724,14 @@ returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   uid uuid := auth.uid(); g record; k int; m int; v smallint; d text[];
   total int := 0; broke int := 0; nf int := 0; sealed boolean;
-  res jsonb := '[]'::jsonb; depths int[] := '{}'; loots text[] := '{}'; msgs text[];
+  res jsonb := '[]'::jsonb; depths int[] := '{}'; loots text[] := '{}'; msgs text[]; mult int;
 begin
   if not public.is_approved() then raise exception 'Accès non autorisé'; end if;
   if idx is null or coalesce(array_length(idx, 1), 0) = 0 then return jsonb_build_object('r', res, 'msgs', '[]'::jsonb); end if;
   if array_length(idx, 1) > 500 then raise exception 'Trop de coups envoyés en même temps'; end if;
   select * into g from public.game where id = 1;
   sealed := public._sealed();
+  mult := public._mult(uid);
   for k in 1 .. array_length(idx, 1) loop
     continue when idx[k] is null or idx[k] < 0 or idx[k] >= g.size * g.size * g.size;
     if sealed and public._is_core(idx[k], g.size) then     -- cœur scellé : le coup ne compte pas
@@ -706,7 +751,7 @@ begin
     total := total + m;
     if v = 0 then
       broke := broke + 1;
-      d := public._reward(idx[k], uid);
+      d := public._reward(idx[k], uid, mult);
       depths := depths || public._depth(idx[k], g.size);
       if d[1] <> '' then nf := nf + 1; end if;
       if d[2] <> '' then loots := loots || d[2]; end if;
@@ -722,20 +767,27 @@ begin
   return jsonb_build_object('r', res, 'msgs', to_jsonb(coalesce(msgs, '{}')));
 end $$;
 
--- Utiliser un artefact. dir = 0..5 (+x, -x, +y, -y, +z, -z) pour le laser.
+-- Utiliser un artefact.
+--   dir : laser = 0..5 (+x, -x, +y, -y, +z, -z) ; scie = axe de la ligne (0 = x, 1 = y, 2 = z)
 create or replace function public.use_artifact(k text, center int, dir int default 0)
 returns json language plpgsql security definer set search_path = public as $$
 declare
-  uid uuid := auth.uid(); s int; cx int; cy int; cz int; r int;
+  uid uuid := auth.uid(); g record; s int; cx int; cy int; cz int; r int;
   dx int := 0; dy int := 0; dz int := 0; px int; py int; pz int; cell int; d text[];
   destroyed int[] := '{}'; found_list jsonb := '[]'::jsonb; nf int := 0; radar int := -1;
   depths int[] := '{}'; loots text[] := '{}'; msgs text[];
-  cells int[] := '{}'; nd int;
+  cells int[] := '{}'; nd int; mult int; sealed boolean;
+  damaged jsonb := '[]'::jsonb; probe jsonb := null; eye jsonb := null;
+  layer int := null; peeled int := 0; bonus int := 0; core_d int; fa int; fb int;
+  e record;
 begin
   if not public.is_approved() then raise exception 'Accès non autorisé'; end if;
   perform public._check_kind(k);
   perform public._take(uid, k, 1);
-  select size into s from public.game where id = 1;
+  select * into g from public.game where id = 1;
+  s := g.size;
+  mult := public._mult(uid);
+  sealed := public._sealed();
   if center is null or center < 0 or center >= s*s*s then
     center := (s/2) + (s/2)*s + (s/2)*s*s;
   end if;
@@ -759,17 +811,104 @@ begin
       exit when px < 0 or py < 0 or pz < 0 or px >= s or py >= s or pz >= s;
       cells := cells || (px + py*s + pz*s*s);
     end loop;
+  elsif k = 'scie' then
+    -- 🪚 une ligne entière, d'un bord à l'autre du cube
+    for r in 0 .. s - 1 loop
+      cells := cells || case coalesce(dir, 0) when 1 then cx + r*s + cz*s*s
+                                              when 2 then cx + cy*s + r*s*s
+                                              else r + cy*s + cz*s*s end;
+    end loop;
   elsif k = 'radar' then
     select ar.i into radar from public.artifacts ar
       where ar.found_by is null
       order by abs(ar.i % s - cx) + abs((ar.i / s) % s - cy) + abs(ar.i / (s*s) - cz)
       limit 1;
     radar := coalesce(radar, -1);
+  elsif k = 'seisme' then
+    -- 🌋 tous les blocs dans un rayon de 6 perdent la moitié de leurs points de vie
+    for e in
+      with c as (
+        select (cx + ox) + (cy + oy)*s + (cz + oz)*s*s as i
+        from generate_series(-6, 6) ox, generate_series(-6, 6) oy, generate_series(-6, 6) oz
+        where ox*ox + oy*oy + oz*oz <= 36
+          and cx + ox between 0 and s - 1 and cy + oy between 0 and s - 1 and cz + oz between 0 and s - 1
+      )
+      insert into public.blocks as b (i, hp)
+      select c.i, (g.max_hp / 2)::smallint from c
+      where not (sealed and public._is_core(c.i, s))
+      on conflict (i) do update set hp = (b.hp / 2)::smallint where b.hp > 0
+      returning b.i, b.hp
+    loop
+      if e.hp = 0 then
+        d := public._reward(e.i, uid, mult);
+        destroyed := destroyed || e.i;
+        depths := depths || public._depth(e.i, s);
+        if d[1] <> '' then nf := nf + 1; found_list := found_list || jsonb_build_array(jsonb_build_object('i', e.i, 'kind', d[1])); end if;
+        if d[2] <> '' then loots := loots || d[2]; end if;
+      else
+        damaged := damaged || jsonb_build_array(jsonb_build_array(e.i, e.hp));
+      end if;
+    end loop;
+  elsif k = 'sonde' then
+    -- 🔍 butin caché dans un cube de 11×11×11 autour du point visé
+    select coalesce(jsonb_agg(jsonb_build_array(q.i, q.l)), '[]'::jsonb) into probe from (
+      select c.i, public._loot(c.i, mult) as l
+      from (select (cx + ox) + (cy + oy)*s + (cz + oz)*s*s as i
+            from generate_series(-5, 5) ox, generate_series(-5, 5) oy, generate_series(-5, 5) oz
+            where cx + ox between 0 and s - 1 and cy + oy between 0 and s - 1 and cz + oz between 0 and s - 1) c
+      where not exists (select 1 from public.blocks b where b.i = c.i and b.hp = 0)
+    ) q where q.l is not null;
+  elsif k = 'aimant' then
+    insert into public.stats as st (player, magnet_until) values (uid, now() + interval '3 minutes')
+      on conflict (player) do update set magnet_until = greatest(coalesce(st.magnet_until, now()), now()) + interval '3 minutes';
+  elsif k = 'cor' then
+    update public.game set rally_until = greatest(coalesce(rally_until, now()), now()) + interval '60 seconds' where id = 1;
+  elsif k = 'oeil' then
+    update public.game set eye_until = greatest(coalesce(eye_until, now()), now()) + interval '5 minutes' where id = 1;
+    select coalesce(jsonb_agg(a.i), '[]'::jsonb) into eye
+      from (select ar.i from public.artifacts ar where ar.found_by is null limit 3000) a;
+  elsif k = 'ecorce' then
+    -- 🧅 arrache toute la couche la plus extérieure qui reste (jamais le cœur)
+    core_d := case when s % 2 = 0 then s/2 - 1 else (s-1)/2 - 1 end;   -- première couche du cœur
+    if not sealed then raise exception 'Il ne reste plus que le cœur : l''Écorce du Monde ne peut pas l''arracher'; end if;
+    with dd as (
+      select public._depth(b.i, s) as dp, count(*) as n from public.blocks b where b.hp = 0 group by 1
+    )
+    select min(l.dp) into layer
+      from generate_series(0, core_d - 1) as l(dp) left join dd on dd.dp = l.dp
+     where coalesce(dd.n, 0) < (s - 2*l.dp)::bigint ^ 3 - greatest(s - 2*l.dp - 2, 0)::bigint ^ 3;
+    if layer is null then raise exception 'Plus aucune couche à arracher'; end if;
+    fa := layer; fb := s - 1 - layer;
+    with c as (
+      select x + y*s + z*s*s as i from generate_series(fa, fb) x, generate_series(fa, fb) y, unnest(array[fa, fb]) z
+      union all
+      select x + y*s + z*s*s from generate_series(fa, fb) x, unnest(array[fa, fb]) y, generate_series(fa + 1, fb - 1) z
+      union all
+      select x + y*s + z*s*s from unnest(array[fa, fb]) x, generate_series(fa + 1, fb - 1) y, generate_series(fa + 1, fb - 1) z
+    ), ins as (
+      insert into public.blocks as b (i, hp) select c.i, 0 from c
+      on conflict (i) do update set hp = 0 where b.hp > 0
+      returning b.i
+    ), arts as (
+      update public.artifacts a set found_by = uid, found_at = now()
+        from ins where a.i = ins.i and a.found_by is null
+      returning a.i, a.kind
+    )
+    select (select count(*) from ins),
+           (select coalesce(jsonb_agg(jsonb_build_object('i', arts.i, 'kind', arts.kind)), '[]'::jsonb) from arts)
+      into peeled, found_list;
+    for e in select x->>'kind' as kind from jsonb_array_elements(found_list) x loop
+      perform public._add(uid, e.kind, 1); nf := nf + 1;
+    end loop;
+    -- pas de butin bloc par bloc (l'économie exploserait) : une prime fixe à la place
+    bonus := 50;
+    perform public._add(uid, 'or', bonus);
+    perform public._bump(uid, bonus, 0, 0, 0, 0);
   end if;
 
   if coalesce(array_length(cells, 1), 0) > 0 then
     foreach cell in array cells loop
-      d := public._destroy(cell, uid);
+      d := public._destroy(cell, uid, mult);
       if d is not null then
         destroyed := destroyed || cell;
         depths := depths || public._depth(cell, s);
@@ -782,14 +921,18 @@ begin
     end loop;
   end if;
 
-  perform public._stats(uid, 0, coalesce(array_length(destroyed, 1), 0), nf, 1, null, null, null);
-  msgs := public._missions_progress(uid, depths, loots, k);
   nd := coalesce(array_length(destroyed, 1), 0);
-  if nd > 0 then
-    update public.game as gm set destroyed = gm.destroyed + nd where gm.id = 1;
+  -- (les blocs de l'Écorce ne comptent pas dans « blocs cassés » du classement)
+  perform public._stats(uid, 0, nd, nf, 1, null, null, null);
+  if k = 'ecorce' then update public.stats set peels = peels + 1 where player = uid; end if;
+  msgs := public._missions_progress(uid, depths, loots, k);
+  if nd + peeled > 0 then
+    update public.game as gm set destroyed = gm.destroyed + nd + peeled where gm.id = 1;
     update public.game set revealed_at = now() where id = 1 and revealed_at is null and public.all_done();
   end if;
   return json_build_object('destroyed', destroyed, 'found', found_list, 'loot', loots, 'radar', radar,
+                           'damaged', damaged, 'probe', probe, 'eye', eye,
+                           'layer', layer, 'peeled', peeled, 'bonus', bonus,
                            'msgs', coalesce(msgs, '{}'));
 end $$;
 
@@ -828,6 +971,7 @@ begin
   if not public.is_approved() then raise exception 'Accès non autorisé'; end if;
   perform public._check_kind(p_kind);
   if p_qty is null or p_qty < 1 or p_qty > 99 then raise exception 'Quantité invalide'; end if;
+  if public._legendary(p_kind) then raise exception 'Les artefacts légendaires ne s''achètent pas'; end if;
   select price into pr from public.shop where kind = p_kind;
   if coalesce(pr, 0) <= 0 then raise exception 'Cet artefact n''est pas en vente'; end if;
   perform public._take(auth.uid(), 'or', pr * p_qty);
@@ -947,13 +1091,13 @@ end $$;
 create or replace function public.get_leaderboard()
 returns table (id uuid, pseudo text, hits bigint, blocks bigint, artifacts_found int, artifacts_used int,
                best_break_ms int, best_cps int, deepest int, last_seen timestamptz,
-               gold int, gold_found int, materials_found int, crafted int, trades int, missions_done int)
+               gold int, gold_found int, materials_found int, crafted int, trades int, missions_done int, peels int)
 language sql stable security definer set search_path = public as $$
   select p.id, p.pseudo, coalesce(s.hits, 0), coalesce(s.blocks, 0), coalesce(s.artifacts_found, 0),
          coalesce(s.artifacts_used, 0), s.best_break_ms, coalesce(s.best_cps, 0), coalesce(s.deepest, 0), s.last_seen,
          coalesce((select iv.qty from public.inventory iv where iv.player = p.id and iv.kind = 'or'), 0),
          coalesce(s.gold_found, 0), coalesce(s.materials_found, 0), coalesce(s.crafted, 0),
-         coalesce(s.trades, 0), coalesce(s.missions_done, 0)
+         coalesce(s.trades, 0), coalesce(s.missions_done, 0), coalesce(s.peels, 0)
   from public.profiles p left join public.stats s on s.player = p.id
   where p.status = 'approved' and public.is_approved()
   order by coalesce(s.blocks, 0) desc, coalesce(s.hits, 0) desc;
@@ -1026,6 +1170,7 @@ begin
   if not public.is_admin() then raise exception 'Réservé à l''administrateur'; end if;
   perform public._check_kind(p_kind);
   if p_price < 0 or p_price > 1000000 then raise exception 'Prix invalide'; end if;
+  if public._legendary(p_kind) and p_price > 0 then raise exception 'Les artefacts légendaires ne se vendent pas'; end if;
   insert into public.shop (kind, price) values (p_kind, p_price)
     on conflict (kind) do update set price = excluded.price;
 end $$;
@@ -1043,6 +1188,7 @@ begin
   delete from public.missions;
   -- (le salon est conservé : on le vide séparément si on veut)
   update public.game set size = new_size, started_at = now(), revealed_at = null, destroyed = 0,
+         rally_until = null, eye_until = null, arts_v4 = true,
          seed = floor(random() * 2000000000)::int where id = 1;
   perform public._regen(new_size);
 end $$;
@@ -1202,6 +1348,17 @@ do $$
 begin
   if not exists (select 1 from public.artifacts) then
     perform public._regen((select size from public.game where id = 1));
+    update public.game set arts_v4 = true where id = 1;
+  end if;
+end $$;
+
+-- Version 4 : cache une seule fois les 7 nouveaux artefacts dans la partie en cours
+do $$
+begin
+  if not (select arts_v4 from public.game where id = 1) then
+    perform public._regen((select size from public.game where id = 1),
+                          array['scie', 'sonde', 'seisme', 'aimant', 'cor', 'ecorce', 'oeil']);
+    update public.game set arts_v4 = true where id = 1;
   end if;
 end $$;
 
@@ -1261,7 +1418,8 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
    ===================================================================== */
 const SUPABASE_URL = 'https://cdylpulhbbzjbyxyqizp.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_nYB5Mluv2qy_FXXCMG6Fpw_VMP36Xmo';
-const ONLINE = !!(SUPABASE_URL && SUPABASE_KEY);
+const HOME_SERVER = 'supabase' === 'maison';          // version « serveur maison »
+const ONLINE = HOME_SERVER || !!(SUPABASE_URL && SUPABASE_KEY);
 
 /* =====================================================================
    1. CONSTANTES ET OBJETS DU JEU
@@ -1280,6 +1438,13 @@ const ARTIFACTS = {
   megabombe: { icon: '☄️', name: 'Météore',      desc: 'Détruit 7×7×7 blocs (343). Extrêmement rare.', target: true },
   marteau:   { icon: '🔨', name: 'Marteau d’or', desc: 'Pendant 45 secondes, chaque coup détruit un bloc entier.', target: false },
   radar:     { icon: '📡', name: 'Radar',        desc: 'Montre pendant 90 s l’artefact caché le plus proche du centre de l’écran.', target: false },
+  scie:      { icon: '🪚', name: 'Scie',         desc: 'Tranche une ligne entière de blocs, d’un bord à l’autre du cube, à travers le bloc visé.', target: true },
+  seisme:    { icon: '🌋', name: 'Séisme',       desc: 'Tous les blocs dans un rayon de 6 perdent la moitié de leurs coups restants.', target: true },
+  sonde:     { icon: '🔍', name: 'Sonde',        desc: 'Montre pendant 60 s les blocs qui cachent de l’or ou des matériaux autour du bloc visé.', target: true },
+  aimant:    { icon: '🧲', name: 'Aimant',       desc: 'Pendant 3 minutes, tu trouves 3 fois plus d’or et de matériaux.', target: false },
+  cor:       { icon: '📯', name: 'Cor de ralliement', desc: 'Pendant 60 s, tous les joueurs connectés frappent deux fois plus fort.', target: false },
+  ecorce:    { icon: '🧅', name: 'Écorce du Monde', desc: 'Légendaire. Arrache d’un coup toute la couche la plus extérieure qui reste (jamais le cœur). +50 🪙.', target: false, rare: true },
+  oeil:      { icon: '👁️', name: 'Œil du Cube',  desc: 'Légendaire. Pendant 5 minutes, tous les joueurs voient où se cachent tous les artefacts.', target: false, rare: true },
 };
 const MATERIALS = {
   silex:   { icon: '🪨', name: 'Silex',        desc: 'Fréquent près de la surface.' },
@@ -1305,7 +1470,7 @@ let me = null, api = null, net = null, ready = false;
 let inventory = {};
 const myStats = { hits: 0, blocks: 0 };
 const session = { best_ms: null, cps: 0, deep: 0 };
-let hammerUntil = 0, armed = null, onlineNames = [], currentPanel = null;
+let hammerUntil = 0, rallyUntil = 0, magnetUntil = 0, armed = null, onlineNames = [], currentPanel = null;
 
 /* =====================================================================
    2. SCÈNE 3D
@@ -1719,6 +1884,69 @@ function showBeacon(i) {
   beaconUntil = performance.now() + 90000;
 }
 
+/* ---------- marqueurs : 🔍 Sonde (butin) et 👁️ Œil du Cube (artefacts) ---------- */
+function makeMarks(size, max) {
+  const m = new THREE.InstancedMesh(new THREE.BoxGeometry(size, size, size),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.7, depthTest: false, depthWrite: false }), max);
+  m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(max * 3), 3);
+  m.frustumCulled = false; m.renderOrder = 998; m.count = 0; m.visible = false;
+  m.userData = { until: 0, cells: new Map(), max };
+  scene.add(m);
+  return m;
+}
+const probeMarks = makeMarks(0.55, 1400), eyeMarks = makeMarks(1.15, 3000);
+const LOOT_RGB = { or: [1, 0.8, 0.15], silex: [0.85, 0.85, 0.85], fer: [0.5, 0.75, 1], poudre: [1, 0.35, 0.3], cristal: [0.55, 1, 1] };
+function showMarks(M, list, seconds) {   // list : [[index, [r, g, b]], …]
+  M.userData.cells.clear();
+  let n = 0;
+  for (const [i, rgb] of list) {
+    if (n >= M.userData.max || !(i >= 0 && i < TOTAL) || hp[i] === 0) continue;
+    _dummy.position.set(i % N - HALF, ((i / N) | 0) % N - HALF, ((i / NN) | 0) - HALF);
+    _dummy.rotation.set(0, 0, 0); _dummy.scale.setScalar(1); _dummy.updateMatrix();
+    M.setMatrixAt(n, _dummy.matrix);
+    M.setColorAt(n, _col.setRGB(rgb[0], rgb[1], rgb[2], THREE.SRGBColorSpace));
+    M.userData.cells.set(i, n++);
+  }
+  M.count = n; M.instanceMatrix.needsUpdate = true; M.instanceColor.needsUpdate = true;
+  M.userData.until = performance.now() + seconds * 1000;
+  M.visible = n > 0; hudDirty = true; requestRender();
+  return n;
+}
+const _zero = new THREE.Matrix4().makeScale(0, 0, 0);
+function hideMark(i) {
+  for (const M of [probeMarks, eyeMarks]) {
+    const k = M.userData.cells.get(i);
+    if (k === undefined) continue;
+    M.setMatrixAt(k, _zero); M.instanceMatrix.needsUpdate = true; M.userData.cells.delete(i);
+  }
+}
+const showEye = (cells, seconds) => showMarks(eyeMarks, cells.map(i => [i, [1, 0.82, 0.3]]), seconds);
+
+/* ---------- 🧅 Écorce du Monde : toute une couche s'envole ---------- */
+let peelFx = null;
+function applyPeel(L) {
+  const a = L, b = N - 1 - L;
+  if (a > b) return 0;
+  let n = 0;
+  const kill = i => { if (hp[i] > 0 && !isCore(i)) { setHp(i, 0, 'peel'); n++; } };
+  for (let z = a; z <= b; z++) for (let y = a; y <= b; y++) {
+    const row = y * N + z * NN;
+    if (z === a || z === b || y === a || y === b) { for (let x = a; x <= b; x++) kill(x + row); }
+    else { kill(a + row); kill(b + row); }
+  }
+  // l'enveloppe de la couche s'envole en s'effaçant
+  if (peelFx) { scene.remove(peelFx.mesh); peelFx.mesh.geometry.dispose(); }
+  const [r, g, bl] = layerRGB(L), size = b - a + 1;
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(size, size, size),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color().setRGB(r, g, bl, THREE.SRGBColorSpace), transparent: true, opacity: 0.85, depthWrite: false }));
+  scene.add(mesh);
+  peelFx = { mesh, t0: performance.now() };
+  const rnd = () => a + Math.floor(Math.random() * size);
+  for (let k = 0; k < 80; k++) spawnParticles(rnd() + rnd() * N + (Math.random() < 0.5 ? a : b) * NN, 1);
+  requestRender();
+  return n;
+}
+
 /* =====================================================================
    5. TRÉSOR
    ===================================================================== */
@@ -1922,7 +2150,8 @@ function setHp(i, v, origin) {
     }
     for (let f = 0; f < 6; f++) removeFace(i, f);
     for (let f = 0; f < 6; f++) { const j = neighbor(i, f); if (j >= 0 && hp[j] > 0) addFace(j, f ^ 1); }
-    spawnParticles(i, origin === 'art' ? 2 : 8);
+    if (origin !== 'peel') spawnParticles(i, origin === 'art' ? 2 : 8);
+    hideMark(i);
     if (isCore(i) && --coreRemaining === 0) onCoreDone(true);
   } else setDamage(i);
   hudDirty = true;
@@ -1946,7 +2175,7 @@ function playerHit(i) {
     flash = 0.5; sfx('hit');
     return;
   }
-  const dmg = now < hammerUntil ? MAX_HP : 1;
+  const dmg = now < hammerUntil ? MAX_HP : Math.min(MAX_HP, now < rallyUntil ? 2 : 1);
   myStats.hits += dmg;
   hitTimes.push(now);
   while (hitTimes.length && now - hitTimes[0] > 10000) hitTimes.shift();
@@ -2043,6 +2272,22 @@ function viewDir() {
   const ax = a[0] >= a[1] && a[0] >= a[2] ? 0 : (a[1] >= a[2] ? 1 : 2);
   return ax * 2 + (d.getComponent(ax) > 0 ? 0 : 1);
 }
+// 🪚 Scie : axe du cube le plus proche de l'horizontale de l'écran (hors axe de visée)
+function sawAxis() {
+  const view = viewDir() >> 1, right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+  let best = -1, ax = 0;
+  for (let k = 0; k < 3; k++) if (k !== view && Math.abs(right.getComponent(k)) > best) { best = Math.abs(right.getComponent(k)); ax = k; }
+  return ax;
+}
+// Durées des effets en cours (lues sur le serveur)
+function applyTimers(c) {
+  if (!c) return;
+  const t = performance.now();
+  if (c.rally_left > 0) rallyUntil = t + c.rally_left * 1000;
+  if (c.magnet_left > 0) magnetUntil = t + c.magnet_left * 1000;
+  if (c.eye_left > 0 && Array.isArray(c.eye)) showEye(c.eye, c.eye_left);
+  hudDirty = true;
+}
 async function useArtifact(kind, target) {
   if (!(inventory[kind] > 0)) return;
   disarm();
@@ -2053,11 +2298,44 @@ async function useArtifact(kind, target) {
     if (center < 0) center = Math.floor(HALF) * (1 + N + NN);
   }
   try {
-    const res = await api.use(kind, center, kind === 'foreuse' ? viewDir() : 0);
+    const res = await api.use(kind, center, kind === 'foreuse' ? viewDir() : kind === 'scie' ? sawAxis() : 0);
     addInv(kind, -1); renderInvBar();
     const list = res.destroyed || [];
     for (const i of list) { setHp(i, 0, 'art'); session.deep = Math.max(session.deep, depthOf(i)); }
     myStats.blocks += list.length;
+    const damaged = res.damaged || [];
+    for (const [i, v] of damaged) setHp(i, v, 'net');
+    if (damaged.length) {
+      sfx('boom'); navigator.vibrate?.([30, 30, 30, 30, 60]);
+      net.send('hits', { r: damaged.flat() });
+    }
+    let extra = '';
+    if (kind === 'seisme') extra = ` : ${fmt.format(damaged.length + list.length)} blocs ébranlés`;
+    if (kind === 'sonde') {
+      const n = showMarks(probeMarks, (res.probe || []).map(([i, l]) => [i, LOOT_RGB[l.split(':')[0]] || [1, 1, 1]]), 60);
+      extra = n ? ` : ${n} butin${n > 1 ? 's' : ''} repéré${n > 1 ? 's' : ''}` : ' : aucun butin dans cette zone';
+      if (n) toast('🔍 Pendant 60 s : 🟡 or · ⚪ silex · 🔵 fer · 🔴 poudre · 🩵 cristal');
+    }
+    if (kind === 'oeil') {
+      const n = showEye(res.eye || [], 300);
+      net.send('eye', { cells: res.eye || [], left: 300, by: me.pseudo });
+      extra = ` : ${fmt.format(n)} artefact${n > 1 ? 's' : ''} révélé${n > 1 ? 's' : ''} pour 5 minutes`;
+      sfx('treasure');
+    }
+    if (kind === 'ecorce') {
+      const L = res.layer;
+      applyPeel(L);
+      net.send('peel', { layer: L, by: me.pseudo });
+      addInv('or', res.bonus || 0);
+      extra = ` : la couche ${L + 1} s’envole (${fmt.format(res.peeled || 0)} blocs) · +${res.bonus || 0} 🪙`;
+      sfx('treasure'); sfx('boom'); navigator.vibrate?.([60, 40, 120]);
+    }
+    if (kind === 'cor' || kind === 'aimant') {
+      const c = await api.gameState().catch(() => null);
+      if (c) { cfg = c; applyTimers(c); }
+      if (kind === 'cor') { net.send('rally', { left: c ? c.rally_left : 60, by: me.pseudo }); sfx('treasure'); extra = ' : tout le monde frappe deux fois plus fort pendant 60 s !'; }
+      if (kind === 'aimant') extra = ' : 3 fois plus de butin pendant 3 minutes';
+    }
     for (const f of res.found || []) gotArtifact(f.kind);
     gotLoot(res.loot || []);
     if (kind === 'marteau') hammerUntil = performance.now() + 45000;
@@ -2068,7 +2346,7 @@ async function useArtifact(kind, target) {
       } else toast('📡 Plus aucun artefact caché !', true);
     }
     if (list.length) { sfx('boom'); navigator.vibrate?.([20, 40, 30]); net.send('hits', { r: list.flatMap(i => [i, 0]) }); }
-    const extra = list.length ? ` : ${fmt.format(list.length)} blocs pulvérisés` : '';
+    if (!extra && list.length) extra = ` : ${fmt.format(list.length)} blocs pulvérisés`;
     toast(`${A.icon} ${A.name}${extra || ' activé'}`, true);
     net.send('feed', { text: `${A.icon} ${me.pseudo} a utilisé : ${A.name}${extra}` });
     gotMessages(res.msgs);
@@ -2255,6 +2533,10 @@ function updateHUD() {
   let sub = `${pct(done / TOTAL)} détruit · Toi : ${fmt.format(myStats.hits)} coups · ${fmt.format(myStats.blocks)} blocs · 🪙 ${fmt.format(inventory.or || 0)}`;
   const hl = hammerUntil - performance.now();
   if (hl > 0) sub += ` · 🔨 ${Math.ceil(hl / 1000)} s`;
+  const tnow = performance.now();
+  if (rallyUntil > tnow) sub += ` · 📯 ×2 ${Math.ceil((rallyUntil - tnow) / 1000)} s`;
+  if (magnetUntil > tnow) sub += ` · 🧲 ${Math.ceil((magnetUntil - tnow) / 1000)} s`;
+  if (eyeMarks.visible) sub += ` · 👁️ ${Math.ceil((eyeMarks.userData.until - tnow) / 1000)} s`;
   $('sub').textContent = sub;
   $('online').textContent = ONLINE ? `👥 En ligne : ${onlineNames.length ? onlineNames.join(', ') : '…'}` : '';
   hudDirty = false;
@@ -2337,6 +2619,7 @@ async function openBoard() {
     ['🤝 Marchand', best('trades', gt), r => `${r.pseudo} · ${r.trades} échanges`],
     ['📜 Missionnaire', best('missions_done', gt), r => `${r.pseudo} · ${r.missions_done} missions`],
     ['⛏️ Prospecteur', best('materials_found', gt), r => `${r.pseudo} · ${r.materials_found} matériaux`],
+    ['🧅 Écorceur', best('peels', gt), r => `${r.pseudo} · ${r.peels} couche${r.peels > 1 ? 's' : ''} arrachée${r.peels > 1 ? 's' : ''}`],
   ];
   const medals = ['🥇', '🥈', '🥉'];
   const done = TOTAL - remaining;
@@ -2426,7 +2709,7 @@ async function openShop(tab = 'boutique') {
       Object.entries(ARTIFACTS).map(([k, A]) => {
         const p = shop[k] || 0;
         return `<div class="item"><div class="ic">${A.icon}</div><div class="tx"><b>${A.name}</b><span class="muted">${A.desc}</span></div>
-          ${p > 0 ? `<button class="primary small" data-buy="${k}" ${gold >= p ? '' : 'disabled'}>${fmt.format(p)} 🪙</button>` : '<span class="muted">pas en vente</span>'}</div>`;
+          ${p > 0 && !A.rare ? `<button class="primary small" data-buy="${k}" ${gold >= p ? '' : 'disabled'}>${fmt.format(p)} 🪙</button>` : `<span class="muted">${A.rare ? '✨ légendaire :<br>à trouver ou fabriquer' : 'pas en vente'}</span>`}</div>`;
       }).join('');
     $('mBody').querySelectorAll('[data-buy]').forEach(b => b.onclick = async () => {
       const k = b.dataset.buy;
@@ -2541,8 +2824,8 @@ async function openAdmin() {
     ${ONLINE ? `<h3>Inscriptions en attente (${pend.length})</h3>
       ${pend.length ? pend.map(p => row(p, `<button class="primary small" data-ok="${p.id}">✓ Valider</button><button class="danger small" data-no="${p.id}">✕</button>`)).join('')
         : '<p class="muted">Personne en attente.</p>'}
-      <div class="sec"><h3>Joueurs</h3>${others.length ? others.map(p => row(p, p.status === 'approved'
-        ? `<button class="danger small" data-no="${p.id}">Retirer l’accès</button>` : `<span class="muted">refusé</span><button class="small" data-ok="${p.id}">Valider</button>`)).join('')
+      <div class="sec"><h3>Joueurs</h3>${others.length ? others.map(p => row(p, (HOME_SERVER ? `<button class="small" data-pw="${p.id}" data-name="${esc(p.pseudo)}" title="Nouveau mot de passe">🔑</button>` : '') + (p.status === 'approved'
+        ? `<button class="danger small" data-no="${p.id}">Retirer l’accès</button>` : `<span class="muted">refusé</span><button class="small" data-ok="${p.id}">Valider</button>`))).join('')
         : '<p class="muted">Aucun joueur pour l’instant.</p>'}</div>` : ''}
 
     <div class="${ONLINE ? 'sec' : ''}"><h3>⚙️ Règles du jeu</h3>
@@ -2552,8 +2835,9 @@ async function openAdmin() {
       <label>Matériaux : 1 bloc sur… (0 = aucun)</label><input id="rMat" type="number" min="0" value="${cfg.mat_every}">
       <div class="btns"><button id="rGo" class="primary">Appliquer les règles</button></div>
       <label>Prix de la boutique en 🪙 (0 = pas en vente)</label>
-      ${Object.entries(ARTIFACTS).map(([k, A]) => `<div class="row" style="margin-bottom:6px"><span style="flex:2">${A.icon} ${A.name}</span>
+      ${Object.entries(ARTIFACTS).filter(([, A]) => !A.rare).map(([k, A]) => `<div class="row" style="margin-bottom:6px"><span style="flex:2">${A.icon} ${A.name}</span>
         <input type="number" min="0" data-price="${k}" value="${shop[k] || 0}" style="flex:1"></div>`).join('')}
+      <p class="muted">🧅 Écorce du Monde et 👁️ Œil du Cube sont légendaires : jamais en vente, seulement trouvés, fabriqués, échangés ou donnés par toi.</p>
       <div class="btns"><button id="pGo" class="primary">Enregistrer les prix</button></div>
     </div>
 
@@ -2570,18 +2854,24 @@ async function openAdmin() {
 
     <div class="sec" id="admArt"><h3>🎒 Artefacts et objets</h3><p class="muted">Chargement…</p></div>
 
+    ${HOME_SERVER ? '<div class="sec" id="admServer"><h3>🖥️ Serveur</h3><p class="muted">Chargement…</p></div>' : ''}
     <div class="sec" id="admDisk"><h3>💾 Espace de la base et salon</h3><p class="muted">Chargement…</p></div>
 
     <div class="sec"><h3>🧊 Nouveau cube</h3>
       <p class="muted">Efface la progression, les artefacts, les inventaires (or compris), le marché, les missions et les statistiques.
       Les comptes, les règles et le trésor sont conservés.</p>
-      <select id="nSize">${SIZES.map(s => `<option value="${s}" ${s === N ? 'selected' : ''}>${s}³ — ${fmt.format(s ** 3)} blocs · jusqu’à ≈ ${fmtMo(estimateMo(s))}${estimateMo(s) > 400 ? ' ⚠️ trop gros pour l’offre gratuite' : ''}</option>`).join('')}</select>
+      <select id="nSize">${SIZES.map(s => `<option value="${s}" ${s === N ? 'selected' : ''}>${s}³ — ${fmt.format(s ** 3)} blocs · jusqu’à ≈ ${fmtMo(estimateMo(s))}${!HOME_SERVER && estimateMo(s) > 400 ? ' ⚠️ trop gros pour l’offre gratuite' : ''}</option>`).join('')}</select>
       <div class="btns"><button id="nGo" class="danger">Recommencer avec ce cube</button></div>
     </div>`;
 
   const B = $('mBody');
   B.querySelectorAll('[data-ok]').forEach(b => b.onclick = async () => { if (await act(() => api.setStatus(b.dataset.ok, 'approved'), '✓ Joueur validé')) openAdmin(); });
   B.querySelectorAll('[data-no]').forEach(b => b.onclick = async () => { if (await act(() => api.setStatus(b.dataset.no, 'refused'))) openAdmin(); });
+  B.querySelectorAll('[data-pw]').forEach(b => b.onclick = async () => {
+    const pw = prompt(`Nouveau mot de passe pour ${b.dataset.name} (6 caractères minimum).\nCommunique-le-lui : il pourra se reconnecter avec.`);
+    if (pw === null) return;
+    await act(() => net.resetPassword(b.dataset.ok || b.dataset.pw, pw), `🔑 Mot de passe de ${b.dataset.name} changé`);
+  });
   $('rGo').onclick = async () => {
     const h = Math.max(1, Math.min(100, Math.floor(+$('rHp').value) || 10));
     const g = Math.max(0, Math.floor(+$('rGold').value) || 0), m = Math.max(0, Math.floor(+$('rMat').value) || 0);
@@ -2621,13 +2911,14 @@ async function openAdmin() {
   };
   $('nGo').onclick = async () => {
     const s = +$('nSize').value;
-    if (ONLINE && estimateMo(s) > 400 && !confirm(`⚠️ Un cube ${s}³ entièrement détruit occuperait environ ${fmtMo(estimateMo(s))} dans la base, au-delà des 500 Mo de l’offre gratuite de Supabase. Continuer quand même ?`)) return;
+    if (ONLINE && !HOME_SERVER && estimateMo(s) > 400 && !confirm(`⚠️ Un cube ${s}³ entièrement détruit occuperait environ ${fmtMo(estimateMo(s))} dans la base, au-delà des 500 Mo de l’offre gratuite de Supabase. Continuer quand même ?`)) return;
     if (!confirm(`Effacer toute la partie et recommencer avec un cube ${s}³ (${fmt.format(s ** 3)} blocs) ?`)) return;
     if (!confirm('Vraiment sûr ? Ce n’est pas annulable.')) return;
     if (await act(() => api.newCube(s))) { net.send('reset', {}); location.reload(); }
   };
   renderAdminArtifacts(ONLINE ? players.filter(p => p.status === 'approved') : [{ id: me.id, pseudo: me.pseudo }]);
   renderAdminDisk();
+  if (HOME_SERVER) renderAdminServer();
 }
 async function renderAdminArtifacts(players) {
   const box = $('admArt');
@@ -2821,6 +3112,71 @@ for (const em of ['👍', '😂', '🎉', '💣', '⛏️', '🪙', '😮', '❤
   $('chatEmo').appendChild(b);
 }
 
+/* ---------- 👑 › Serveur (version maison / VPS) ---------- */
+const fmtBytes = b => b >= 1073741824 ? (b / 1073741824).toFixed(1).replace('.', ',') + ' Go' : fmtMo(b / 1048576);
+const fmtDur = s => s < 3600 ? `${Math.max(1, Math.round(s / 60))} min` : s < 86400 ? `${Math.floor(s / 3600)} h ${Math.round(s % 3600 / 60)} min` : `${Math.floor(s / 86400)} j ${Math.floor(s % 86400 / 3600)} h`;
+const fmtDate = d => d ? new Date(d).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+async function renderAdminServer() {
+  const box = $('admServer');
+  if (!box) return;
+  let st;
+  try { st = await net.serverStatus(); } catch (e) { box.innerHTML = `<h3>🖥️ Serveur</h3><p>⚠️ ${esc(e.message)}</p>`; return; }
+  const last = st.backups[st.backups.length - 1];
+  const memUsed = st.mem_total - st.mem_free;
+  const tun = st.tunnel.mode === 'permanent' ? (st.tunnel.ok ? '🟢 adresse permanente connectée' : '🟠 adresse permanente : connexion en cours…')
+    : st.tunnel.mode === 'gratuit' ? (st.tunnel.url ? `${st.tunnel.ok ? '🟢' : '🟠'} <a href="${esc(st.tunnel.url)}" target="_blank" style="color:var(--gold)">${esc(st.tunnel.url)}</a>${st.tunnel.ok ? '' : ' (connexion en cours…)'}` : '🟠 adresse gratuite : démarrage…')
+    : '🔴 aucun tunnel (accès seulement en local)';
+  box.innerHTML = `<h3>🖥️ Serveur</h3>
+    <div class="muted" style="opacity:.9;line-height:1.7">
+      🌍 ${tun}<br>
+      ⏱️ En marche depuis ${fmtDur(st.uptime_s)} · ${st.players_online} joueur${st.players_online > 1 ? 's' : ''} connecté${st.players_online > 1 ? 's' : ''}<br>
+      🧠 Mémoire ${fmtBytes(memUsed)} / ${fmtBytes(st.mem_total)} · charge ${st.load[0].toFixed(2).replace('.', ',')} (${st.cpus} cœur${st.cpus > 1 ? 's' : ''})<br>
+      💽 Disque libre ${st.disk ? fmtBytes(st.disk.free) + ' / ' + fmtBytes(st.disk.total) : '—'} · partie ${fmtBytes(st.data_size)}<br>
+      🏷️ Version ${esc(st.version.ref)} du ${fmtDate(st.version.date)} · Node ${esc(st.node)}
+    </div>
+    <label>Sauvegardes (${st.backups.length}, les 10 dernières sont gardées)</label>
+    <div class="muted" style="margin-bottom:4px">Dernière : ${last ? `${esc(last.name)} (${fmtBytes(last.size)})` : 'aucune pour l’instant'}</div>
+    <div class="btns" style="margin-top:0"><button id="svBackup" class="small">💾 Sauvegarder maintenant</button>
+      <button id="svDownload" class="small" ${last ? '' : 'disabled'}>⬇️ Télécharger la dernière</button>
+      <button id="svRestore" class="danger small">⬆️ Restaurer une sauvegarde…</button></div>
+    <input type="file" id="svFile" accept=".gz,.tar.gz,application/gzip" class="hidden">
+    <label>Adresse permanente (jeton de tunnel Cloudflare)</label>
+    <div class="row"><input id="svToken" placeholder="${st.tunnel.mode === 'permanent' ? 'Un jeton est enregistré : colle-en un autre pour le remplacer' : 'Colle ici la commande copiée depuis Cloudflare (eyJ…)'}" autocomplete="off"></div>
+    <div class="btns"><button id="svTokenSave" class="small primary">Enregistrer et redémarrer</button>
+      ${st.tunnel.mode === 'permanent' ? '<button id="svTokenDel" class="small">Revenir à l’adresse gratuite</button>' : ''}
+      <button id="svRestart" class="small">🔄 Redémarrer le serveur</button></div>`;
+  $('svBackup').onclick = async () => {
+    $('svBackup').disabled = true;
+    const r = await act(() => net.backupNow(), r => `💾 Sauvegarde faite : ${r.name}`);
+    if (r) renderAdminServer(); else $('svBackup').disabled = false;
+  };
+  $('svDownload').onclick = () => act(() => net.downloadBackup(), n => `⬇️ Téléchargement : ${n}`);
+  $('svRestore').onclick = () => $('svFile').click();
+  $('svFile').onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    if (!confirm(`Remplacer TOUTE la partie actuelle par la sauvegarde « ${f.name} » ?\n\nTous les joueurs seront déconnectés quelques secondes. La partie actuelle est mise de côté sur le serveur (dossier donnees-ancien-…).`)) { e.target.value = ''; return; }
+    toast('⬆️ Envoi de la sauvegarde…', true);
+    try {
+      await net.restoreBackup(f, pc => { $('svRestore').textContent = `⬆️ Envoi… ${Math.round(pc * 100)} %`; });
+      toast('🔄 Sauvegarde reçue : le serveur redémarre…', true);
+      setTimeout(() => location.reload(), 15000);
+    } catch (err) { toast('⚠️ ' + err.message); renderAdminServer(); }
+  };
+  $('svTokenSave').onclick = async () => {
+    const t = $('svToken').value.trim();
+    if (!t) return toast('Colle d’abord le jeton (ou la commande) copié depuis Cloudflare');
+    if (await act(() => net.setTunnelToken(t), '🔄 Jeton enregistré : le serveur redémarre…')) setTimeout(() => location.reload(), 15000);
+  };
+  if ($('svTokenDel')) $('svTokenDel').onclick = async () => {
+    if (!confirm('Revenir à l’adresse gratuite (trycloudflare) ? L’adresse du jeu va changer.')) return;
+    if (await act(() => net.setTunnelToken(''), '🔄 Retour à l’adresse gratuite : le serveur redémarre…')) setTimeout(() => location.reload(), 15000);
+  };
+  $('svRestart').onclick = async () => {
+    if (!confirm('Redémarrer le serveur ? Les joueurs seront déconnectés quelques secondes.')) return;
+    if (await act(() => net.restartServer(), '🔄 Le serveur redémarre…')) setTimeout(() => location.reload(), 15000);
+  };
+}
+
 /* ---------- Jauge d'espace disque (panneau admin) ---------- */
 const BYTES_PER_BLOCK = 60;                       // mesuré : ~59 octets par bloc entamé ou détruit
 const estimateMo = s => s ** 3 * BYTES_PER_BLOCK / 1048576;
@@ -2830,15 +3186,15 @@ async function renderAdminDisk() {
   if (!box) return;
   let d;
   try { d = await api.dbSize(); } catch (e) { box.innerHTML = `<h3>💾 Espace de la base et salon</h3><p>⚠️ ${esc(e.message)}</p>`; return; }
-  const mo = b => b / 1048576, lim = mo(d.limit), tot = mo(d.total), pc = Math.min(100, tot / lim * 100);
-  const full = estimateMo(N);
+  const mo = b => b / 1048576, lim = HOME_SERVER ? 20480 : mo(d.limit), tot = mo(d.total), pc = Math.min(100, tot / lim * 100);
+  const full = estimateMo(N), tooBig = !HOME_SERVER && full > 400;
   box.innerHTML = `<h3>💾 Espace de la base et salon</h3>
-    <div class="row" style="justify-content:space-between"><b>${fmtMo(tot)} utilisés</b><span class="muted">sur ${fmtMo(lim)} (offre gratuite)</span></div>
+    <div class="row" style="justify-content:space-between"><b>${fmtMo(tot)} utilisés</b><span class="muted">${HOME_SERVER ? 'sur le disque du serveur' : `sur ${fmtMo(lim)} (offre gratuite)`}</span></div>
     <div class="gauge"><i style="width:${pc.toFixed(1)}%"></i></div>
     <div class="muted" style="opacity:.85;line-height:1.6">
       🧊 Cube : ${fmtMo(mo(d.blocks))} (${fmt.format(d.blocks_count)} blocs entamés ou détruits)<br>
       💬 Salon : ${fmtMo(mo(d.chat))} (${fmt.format(d.chat_count)} message${d.chat_count > 1 ? 's' : ''}, 5 000 au maximum)<br>
-      📈 Ce cube ${N}³ entièrement détruit occupera environ <b>${fmtMo(full)}</b>${full > 400 ? ' ⚠️ trop pour l’offre gratuite' : ''}.
+      📈 Ce cube ${N}³ entièrement détruit occupera environ <b>${fmtMo(full)}</b>${tooBig ? ' ⚠️ trop pour l’offre gratuite' : ''}.
     </div>
     <div class="btns"><button id="dOld" class="small">🧹 Effacer les messages de plus de 7 jours</button>
       <button id="dAll" class="danger small">🗑 Vider tout le salon</button></div>`;
@@ -2939,7 +3295,17 @@ async function createOnline() {
   let ch = null, handler = () => {}, presenceCb = () => {};
   net = {
     async start() {
-      const prof = await authFlow(sb);
+      const prof = await authFlow({
+        session: async () => !!(await sb.auth.getSession()).data.session,
+        me: async () => { const { data, error } = await sb.rpc('me'); if (error) throw new Error(error.message); return data; },
+        signIn: async (email, password) => { const { error } = await sb.auth.signInWithPassword({ email, password }); if (error) throw error; },
+        signUp: async (email, password, pseudo) => {
+          const { data, error } = await sb.auth.signUp({ email, password, options: { data: { pseudo } } });
+          if (error) throw error;
+          return !!data.session;
+        },
+        signOut: () => sb.auth.signOut(),
+      });
       me = { id: prof.id, pseudo: prof.pseudo, isAdmin: prof.is_admin };
       $('loading').style.display = 'flex';
       const { data: { session } } = await sb.auth.getSession();
@@ -2991,6 +3357,108 @@ async function createOnline() {
   };
 }
 
+/* ---------- Serveur maison (même moteur, hébergé chez soi) ---------- */
+async function createHome() {
+  const TK = 'le-cube-maison-jeton';
+  let token = null;
+  try { token = localStorage.getItem(TK); } catch (e) {}
+  const post = async (path, body) => {
+    let r;
+    try {
+      r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+        body: JSON.stringify(body || {}) });
+    } catch (e) { throw new Error('Serveur injoignable : le PC qui héberge le jeu est-il allumé ?'); }
+    const j = await r.json().catch(() => ({ error: 'Réponse illisible du serveur' }));
+    if (!r.ok || j.error) throw new Error(j.error || ('Erreur ' + r.status));
+    return j;
+  };
+  const setToken = t => { token = t; try { t ? localStorage.setItem(TK, t) : localStorage.removeItem(TK); } catch (e) {} };
+  const call = async (fn, args) => (await post('/api/rpc/' + fn, args)).data;
+  api = makeApi(call, call);
+  let ws = null, handler = () => {}, presenceCb = () => {}, stopped = false, lastNames = [];
+  function connect(first) {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${proto}//${location.host}/ws?token=${encodeURIComponent(token)}`);
+    let opened = false;
+    ws.onopen = () => {
+      opened = true;
+      if (connect.warned) toast('✓ Direct rétabli');
+      if (!first) handler({ type: 'resync' });
+      connect.warned = false; clearTimeout(connect.warnTimer); connect.warnTimer = null;
+    };
+    ws.onmessage = e => {
+      let m; try { m = JSON.parse(e.data); } catch (err) { return; }
+      if (m.type === '__presence') { lastNames = m.names || []; presenceCb(lastNames); }
+      else handler(m);
+    };
+    ws.onclose = () => {
+      if (stopped) return;
+      if (!connect.warnTimer && !connect.warned) connect.warnTimer = setTimeout(() => {
+        connect.warnTimer = null;
+        if (!ws || ws.readyState !== 1) { connect.warned = true; toast('⚠️ Direct interrompu : reconnexion en cours…'); }
+      }, 15000);
+      setTimeout(() => connect(false), opened ? 1000 : 4000);
+    };
+  }
+  net = {
+    async start() {
+      const prof = await authFlow({
+        session: async () => !!token,
+        me: async () => {
+          let p = null;
+          try { p = await call('me'); } catch (e) { setToken(null); throw e; }
+          if (!p) { setToken(null); throw new Error('Session expirée : reconnecte-toi.'); }
+          return p;
+        },
+        signIn: async (email, password) => setToken((await post('/api/login', { email, password })).token),
+        signUp: async (email, password, pseudo) => { setToken((await post('/api/signup', { email, password, pseudo })).token); return true; },
+        signOut: async () => { try { await post('/api/logout'); } catch (e) {} setToken(null); },
+      });
+      me = { id: prof.id, pseudo: prof.pseudo, isAdmin: prof.is_admin };
+      $('loading').style.display = 'flex';
+      connect(true);
+    },
+    send(type, payload) {
+      if ((type === 'feed' || type === 'market') && payload?.text) chatEvent(payload.text);
+      if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type, ...payload }));
+    },
+    onMessage(fn) { handler = fn; },
+    onPresence(fn) { presenceCb = fn; fn(lastNames); },
+    // la photo du trésor est gardée dans la base : seuls l'admin, puis les joueurs à la fin, peuvent la lire
+    async uploadImage(file) { return blobToDataURL(await downscaleImage(file, 900)); },
+    async imageUrl(p) { return p; },
+    async logout() { stopped = true; try { await post('/api/logout'); } catch (e) {} setToken(null); location.reload(); },
+    resetPassword: (user_id, password) => post('/api/admin/reset-password', { user_id, password }),
+    serverStatus: () => post('/api/admin/status'),
+    backupNow: () => post('/api/admin/backup-now'),
+    restartServer: () => post('/api/admin/restart'),
+    setTunnelToken: t => post('/api/admin/tunnel-token', { token: t }),
+    async downloadBackup(name) {
+      const r = await fetch('/api/admin/download-backup', { method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ name: name || '' }) });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || ('Erreur ' + r.status));
+      const blob = await r.blob();
+      const fname = (r.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/)?.[1] || 'le-cube-sauvegarde.tar.gz';
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fname;
+      document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+      return fname;
+    },
+    async restoreBackup(file, onProgress) {
+      return new Promise((resolve, reject) => {
+        const x = new XMLHttpRequest();
+        x.open('POST', '/api/admin/restore');
+        x.setRequestHeader('Authorization', 'Bearer ' + token);
+        x.setRequestHeader('Content-Type', 'application/octet-stream');
+        x.upload.onprogress = e => e.lengthComputable && onProgress?.(e.loaded / e.total);
+        x.onload = () => { let j = {}; try { j = JSON.parse(x.responseText); } catch (e) {}
+          x.status === 200 ? resolve(j) : reject(new Error(j.error || ('Erreur ' + x.status))); };
+        x.onerror = () => reject(new Error('Envoi interrompu'));
+        x.send(file);
+      });
+    },
+  };
+}
+
 /* ---------- Solo : le même moteur SQL, exécuté dans le navigateur ---------- */
 const SOLO_STUB = `
 do $$ begin
@@ -3035,7 +3503,7 @@ async function createSolo() {
 }
 
 /* ---------- écran de connexion / inscription ---------- */
-function authFlow(sb) {
+function authFlow(A) {
   const box = $('auth');
   $('loading').style.display = 'none';
   box.classList.add('open');
@@ -3054,10 +3522,10 @@ function authFlow(sb) {
   $('tSignup').onclick = () => setMode('signup');
   return new Promise(resolve => {
     async function check() {
-      const { data: { session } } = await sb.auth.getSession();
-      if (!session) { view('vLogin'); return; }
-      const { data: p, error } = await sb.rpc('me');
-      if (error || !p) { msg(error ? error.message : 'Profil introuvable : le script SQL a-t-il été lancé ?'); view('vLogin'); return; }
+      if (!(await A.session())) { view('vLogin'); return; }
+      let p = null, err = null;
+      try { p = await A.me(); } catch (e) { err = e; }
+      if (err || !p) { msg(err ? err.message : 'Profil introuvable : le script SQL a-t-il été lancé ?'); view('vLogin'); return; }
       if (p.status === 'approved') { box.classList.remove('open'); resolve(p); }
       else view(p.status === 'refused' ? 'vRefused' : 'vPending');
     }
@@ -3067,15 +3535,12 @@ function authFlow(sb) {
       $('aGo').disabled = true; msg('');
       try {
         if (mode === 'login') {
-          const { error } = await sb.auth.signInWithPassword({ email, password });
-          if (error) throw error;
+          await A.signIn(email, password);
           await check();
         } else {
           const pseudo = $('aPseudo').value.trim();
           if (!pseudo) throw new Error('Choisis un pseudo');
-          const { data, error } = await sb.auth.signUp({ email, password, options: { data: { pseudo } } });
-          if (error) throw error;
-          if (data.session) await check();
+          if (await A.signUp(email, password, pseudo)) await check();
           else { setMode('login'); msg('Compte créé ! Vérifie ta boîte mail pour confirmer, puis connecte-toi.', true); }
         }
       } catch (e) {
@@ -3084,7 +3549,7 @@ function authFlow(sb) {
       $('aGo').disabled = false;
     };
     $('aRefresh').onclick = check;
-    $('aLogout').onclick = $('aLogout2').onclick = async () => { await sb.auth.signOut(); view('vLogin'); msg(''); };
+    $('aLogout').onclick = $('aLogout2').onclick = async () => { await A.signOut(); view('vLogin'); msg(''); };
     check();
   });
 }
@@ -3100,6 +3565,14 @@ function onNetMessage(m) {
   if (m.type === 'resync') resyncBlocks();
   else if (m.type === 'hits' && Array.isArray(m.r)) {
     for (let k = 0; k + 1 < m.r.length; k += 2) { const i = m.r[k]; if (i >= 0 && i < TOTAL) setHp(i, m.r[k + 1], 'net'); }
+  } else if (m.type === 'peel' && m.layer >= 0) {
+    applyPeel(m.layer); sfx('boom');
+  } else if (m.type === 'rally') {
+    rallyUntil = performance.now() + Math.min(600, +m.left || 60) * 1000; hudDirty = true;
+    sfx('treasure');
+  } else if (m.type === 'eye' && Array.isArray(m.cells)) {
+    showEye(m.cells, Math.min(600, +m.left || 300));
+    sfx('treasure');
   } else if (m.type === 'feed') { toast(m.text); chatEvent(m.text); }
   else if (m.type === 'chat' && m.m) chatReceive(m.m);
   else if (m.type === 'chatdel') chatRemove(m.id);
@@ -3116,7 +3589,7 @@ function onNetMessage(m) {
     api.gameState().then(c => { if (c) cfg = c; refreshPanel('shop'); });
   } else if (m.type === 'reload') {
     toast(m.text || '⚙️ Les règles ont changé…', true);
-    setTimeout(() => location.reload(), 2500);
+    setTimeout(() => location.reload(), m.delay || 2500);
   } else if (m.type === 'reset') {
     toast('🧊 Un nouveau cube commence…', true);
     setTimeout(() => location.reload(), 2000);
@@ -3169,7 +3642,18 @@ function loop() {
     treasureObj.root.position.y = Math.sin(t * 1.4) * 0.05 * coreSize;
     if (treasureView || treasureRevealed) needsRender = true;
   }
-  if (hammerUntil > now) hudDirty = true;
+  if (hammerUntil > now || rallyUntil > now || magnetUntil > now) hudDirty = true;
+  for (const M of [probeMarks, eyeMarks]) if (M.visible) {
+    if (now > M.userData.until) { M.visible = false; hudDirty = true; }
+    else { M.material.opacity = 0.45 + 0.4 * Math.abs(Math.sin(now / 350)); hudDirty = hudDirty || M === eyeMarks; }
+    needsRender = true;
+  }
+  if (peelFx) {
+    const t = (now - peelFx.t0) / 1600;
+    if (t >= 1) { scene.remove(peelFx.mesh); peelFx.mesh.geometry.dispose(); peelFx = null; }
+    else { peelFx.mesh.scale.setScalar(1 + t * 0.7); peelFx.mesh.material.opacity = 0.85 * (1 - t); peelFx.mesh.rotation.y = t * 0.6; }
+    needsRender = true;
+  }
   if (hudDirty) updateHUD();
   if (needsRender) {
     cullFaces();
@@ -3194,7 +3678,7 @@ function loop() {
    ===================================================================== */
 async function boot() {
   try {
-    if (ONLINE) await createOnline(); else await createSolo();
+    if (HOME_SERVER) await createHome(); else if (ONLINE) await createOnline(); else await createSolo();
     await net.start();
     cfg = await api.gameState();
     if (!cfg) throw new Error('Accès non autorisé');
@@ -3223,6 +3707,7 @@ async function boot() {
       if (mine) { myStats.hits = +mine.hits; myStats.blocks = +mine.blocks; }
     } catch (e) {}
     renderInvBar();
+    applyTimers(cfg);
     $('bAdmin').classList.toggle('hidden', !me.isAdmin);
     chatReload();
     if (coreRemaining === 0) onCoreDone(false);
@@ -3234,6 +3719,10 @@ async function boot() {
     console.error(e);
     $('loading').style.display = 'flex';
     $('loading').innerHTML = `⚠️ Impossible de démarrer :<br>${esc(e.message)}`;
+    if (HOME_SERVER && /injoignable|Failed to fetch|NetworkError/i.test(e.message)) {
+      $('loading').innerHTML += '<br><span class="muted">Nouvel essai automatique dans 5 secondes…</span>';
+      setTimeout(() => location.reload(), 5000);
+    }
   }
 }
 boot();
